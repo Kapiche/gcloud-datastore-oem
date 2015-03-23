@@ -1,6 +1,7 @@
 import unittest2 as unittest
 
 from gcloudoem import entity, properties, connect, Key
+from gcloudoem.queryset.errors import ValidationError
 
 
 class Entity(unittest.TestCase):
@@ -36,7 +37,17 @@ class Entity(unittest.TestCase):
         pass
 
     def test_validate(self):
-        pass
+        class TEntity(entity.Entity):
+            name = properties.TextProperty(required=True)
+            age = properties.IntegerProperty(choices=[0])
+
+        e = TEntity()
+        self.assertRaises(ValidationError, e.validate)
+        e.name = "Bob"
+        e.age = 0
+        e.validate()
+        e.age = 1
+        self.assertRaises(ValidationError, e.validate)
 
     def test_property(self):
         class TEntity(entity.Entity):

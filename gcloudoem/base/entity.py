@@ -57,5 +57,5 @@ class BaseEntity(object):
                 errors[field.name] = error
 
         if errors:
-            message = "ValidationError (%s:%s) " % (self.__class__, self.key)
+            message = "ValidationError (%s:%s) " % (self.__class__, self.key.name_or_id)
             raise ValidationError(message, errors=errors)

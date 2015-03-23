@@ -109,17 +109,6 @@ class KeyProperty(BaseProperty):
 
         return key
 
-    def validate(self, value):
-        from .base.entity import BaseEntity
-        kind, value = value
-        if not isinstance(value, (six.text_type, int)):
-            self.error('Value for a KeyProperty must be an int or str (unicode in Python 2).')
-        if self.parent and not isinstance(self.parent, BaseEntity):
-            self.error('Parent must be a BaseEntity')
-        if not self._dataset_id:
-            self.error('No dataset_id set for this key. Have you called set_defaults()?')
-        return super(KeyProperty).validate(value)
-
 
 class IntegerProperty(BaseProperty):
     """An int property."""
@@ -145,7 +134,7 @@ class FloatProperty(BaseProperty):
         return 'double_value', value
 
     def validate(self, value):
-        if not isinstance(value, six.integer_types + float):
+        if not isinstance(value, six.integer_types + (float,)):
             self.error('Value must be an int or float (or long in Python 2).')
         return float(value)
 

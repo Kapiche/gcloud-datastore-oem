@@ -2,6 +2,7 @@ import six
 import unittest2 as unittest
 
 from gcloudoem import entity, properties, connect
+from gcloudoem.queryset.errors import ValidationError
 
 
 class Properties(unittest.TestCase):
@@ -29,6 +30,9 @@ class Properties(unittest.TestCase):
         self.assertTrue(e.test_bool)
         self.assertIsInstance(TEntity.test_bool, properties.BooleanProperty)
 
+        TEntity.test_bool._validate(True)
+        self.assertRaises(ValidationError, TEntity.test_bool._validate, 1)
+
     def test_IntegerProperty(self):
         class TEntity(entity.Entity):
             test_int = properties.IntegerProperty()
@@ -45,6 +49,9 @@ class Properties(unittest.TestCase):
         self.assertEqual(e.test_int, 4)
         self.assertIsInstance(TEntity.test_int, properties.IntegerProperty)
 
+        TEntity.test_int._validate(1)
+        self.assertRaises(ValidationError, TEntity.test_int._validate, '')
+
     def test_FloatProperty(self):
         class TEntity(entity.Entity):
             test_float = properties.FloatProperty()
@@ -60,6 +67,9 @@ class Properties(unittest.TestCase):
         e.test_float = 0.2
         self.assertEqual(e.test_float, 0.2)
         self.assertIsInstance(TEntity.test_float, properties.FloatProperty)
+
+        TEntity.test_float._validate(1.1)
+        self.assertRaises(ValidationError, TEntity.test_float._validate, '')
 
     def test_TextProperty(self):
         class TEntity(entity.Entity):
@@ -80,6 +90,9 @@ class Properties(unittest.TestCase):
         e = TEntity()
         self.assertEqual(e.test_text, "")
         self.assertIsInstance(TEntity.test_text, properties.TextProperty)
+
+        TEntity.test_text._validate('abc')
+        self.assertRaises(ValidationError, TEntity.test_text._validate, b'blah')
 
     def test_PickleProperty(self):
         class TEntity(entity.Entity):
@@ -127,6 +140,9 @@ class Properties(unittest.TestCase):
         e = TEntity()
         self.assertEqual(e.test_datetime, utcnow)
 
+        TEntity.test_datetime._validate(utcnow)
+        self.assertRaises(ValidationError, TEntity.test_datetime._validate, False)
+
     def test_DateProperty(self):
         import datetime
 
@@ -142,6 +158,9 @@ class Properties(unittest.TestCase):
 
         self.assertIsInstance(TEntity.test_date, properties.DateProperty)
 
+        TEntity.test_date._validate(today)
+        self.assertRaises(ValidationError, TEntity.test_date._validate, False)
+
     def test_TimeProperty(self):
         import datetime
 
@@ -155,3 +174,6 @@ class Properties(unittest.TestCase):
         e.test_time = t
         self.assertEqual(e.test_time, t)
         self.assertIsInstance(TEntity.test_time, properties.TimeProperty)
+
+        TEntity.test_time._validate(t)
+        self.assertRaises(ValidationError, TEntity.test_time._validate, False)
