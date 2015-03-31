@@ -1,5 +1,11 @@
+# Copyright (c) 2012-2015 Kapiche Ltd.
+# Author: Ryan Stuart<ryan@kapiche.com>
+from __future__ import absolute_import
+from __future__ import absolute_import
+
 import six
-from gcloudoem.queryset.errors import ValidationError
+
+from ..exceptions import ValidationError
 
 
 class BaseProperty(object):
@@ -13,37 +19,42 @@ class BaseProperty(object):
 
     This class shouldn't be used directly. Instead, it is intended to be extended by concrete property implementations.
     """
-    def __init__(self, db_name=None, required=False, default=None, choices=None, help_text=None, verbose_name=None):
+    def __init__(self, name=None, db_name=None, required=False, default=None, choices=None, help_text=None,
+                 verbose_name=None, exclude_from_index=False):
         """
         Initialise a property.
 
-        :param bool db_field: That datastore name used for this property. Defaults to the the attribute name used for
-            this property on an `Entity`.
+        :param str name: The name used for this property on the entity. Defaults to the the attribute name used for
+            this property on an :class:`~gcloudoem.entity.Entity`.
+        :param str db_name: The datastore name used for this property. Defaults to `name`.
         :param bool required: Is this property is required? Defaults to False.
         :param default: (optional) The default value of this property of no value has been set? Can be a callable.
         :param list choices: (optional) A list of values this property should have.
         :param str help_text: (optional) The help text for this property. Might be used by implementers of a GUI.
         :param str verbose_name: The verbose name for this property. Designed to be human readable. Might be used by
             implementers of a GUI.
+        :param bool exclude_from_index: Weather to exclude this property from the entity's index.
         """
-        self.db_name = self.name = db_name
+        self.name = self.db_name = name
+        self.db_name = db_name
         self.required = required
         self.default = default
         self.choices = choices
         self.help_text = help_text
         self.verbose = verbose_name
+        self.exclude_from_index = exclude_from_index
 
     def __get__(self, instance, owner):
         if not instance:  # being called on an entity class
             return self
-        return instance._data.get(self.db_name)
+        return instance._data.get(self.name)
 
     def __set__(self, instance, value):
         if value is None and self.default is not None:
             value = self.default
             if callable(value):
                 value = value()
-        instance._data[self.db_name] = value
+        instance._data[self.name] = value
 
     def from_protobuf(self, pb_value):
         """
@@ -114,5 +125,5 @@ class BaseProperty(object):
 
     def error(self, message="", errors=None, field_name=None):
         """Raises a ValidationError."""
-        field_name = field_name if field_name else self.db_name
+        field_name = field_name if field_name else self.name
         raise ValidationError(message, errors=errors, field_name=field_name)

@@ -1,10 +1,11 @@
+# Copyright (c) 2012-2015 Kapiche Ltd.
+# Author: Ryan Stuart<ryan@kapiche.com>
 from __future__ import absolute_import
 
 from io import open
 import os
 
-from . import entity, properties
-from .datastore import credentials, connection, environment, helper, set_defaults, connect
+from .datastore import credentials, connection, environment, utils, connect
 from .entity import *
 from .properties import *
 

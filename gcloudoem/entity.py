@@ -1,3 +1,5 @@
+# Copyright (c) 2012-2015 Kapiche Ltd.
+# Author: Ryan Stuart<ryan@kapiche.com>
 """
 :class:`.Entity`s are the building blocks of the OEM layer, providing object-orientated interaction with datastore
 entities.
@@ -8,10 +10,7 @@ from future.utils import with_metaclass
 
 from .base.entity import BaseEntity
 from .base.metaclasses import EntityMeta
-
-
-class ObjectDoesNotExist(Exception):
-    """Couldn't fetch an entity by id."""
+from .datastore.transaction import Transaction
 
 
 class Entity(with_metaclass(EntityMeta, BaseEntity)):
@@ -49,7 +48,7 @@ class Entity(with_metaclass(EntityMeta, BaseEntity)):
 
     def save(self, force_insert=False, validate=True, clean=True, **kwargs):
         """
-        Save the :class:`~gcloudoem.entity.Entity` to the database. If the entity already exists, it will be updated,
+        Save the :class:`Entity` to the database. If the entity already exists, it will be updated,
         otherwise it will be created.
 
         :param force_insert: only try to create a new document, don't allow updates of existing documents. Defaults to
@@ -58,17 +57,43 @@ class Entity(with_metaclass(EntityMeta, BaseEntity)):
         :param clean: call the document clean method, requires `validate` to be True.
 
         """
-        pass
+        if validate:
+            self.validate(clean=clean)
+
+        with Transaction(Transaction.SNAPSHOT) as txn:
+            if force_insert:
+                txn.create(self)
+            else:
+                txn.put(self)
+
+    def delete(self):
+        """Delete this entity from Datastore."""
+        with Transaction(Transaction.SNAPSHOT) as txn:
+            txn.delete(self)
+
+    @classmethod
+    def from_protobuf(cls, pb):
+        key = None
+        if pb.HasField('key'):
+            key = cls._properties['key'].from_protobuf(pb.key)
+
+        entity_props = {
+            'key': key
+        }
+
+        for property_pb in pb.property:
+            if not hasattr(cls, property_pb.name):
+                raise ValueError("Entity %s doesn't have a property by the name %s" %
+                                 (cls._meta.kind, property_pb.name))
+            value = cls._properties[property_pb.name].from_protobuf(property_pb.value)
+            entity_props[property_pb.name] = value
+
+        return cls(**entity_props)
 
     def __repr__(self):
         key = self._data['key']
-        id_or_name = None
-        if 'id' in key:
-            id_or_name = key['id']
-        elif 'name' in key:
-            id_or_name = key['name']
         return "<%s (%s) %s)>" % (
             self.__class__.__name__,
-            id_or_name,
+            key.name_or_id,
             super(Entity, self).__repr__()
         )

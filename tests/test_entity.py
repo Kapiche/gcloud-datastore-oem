@@ -1,10 +1,12 @@
+# Copyright (c) 2012-2015 Kapiche Ltd.
+# Author: Ryan Stuart<ryan@kapiche.com>
 import unittest2 as unittest
 
 from gcloudoem import entity, properties, connect, Key
-from gcloudoem.queryset.errors import ValidationError
+from gcloudoem.exceptions import ValidationError
 
 
-class Entity(unittest.TestCase):
+class TestEntity(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         connect("DATASET")
@@ -14,7 +16,7 @@ class Entity(unittest.TestCase):
             pass
 
         t1 = TEntity(key=1)
-        self.assertEqual(t1.key.kind, TEntity.__name__)
+        self.assertEqual(t1.key.kind, TEntity._meta.kind)
         self.assertEqual(t1.key.id, 1)
         self.assertEqual(t1.key.name_or_id, 1)
         self.assertIsNone(t1.key.parent)

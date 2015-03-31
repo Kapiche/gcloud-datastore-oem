@@ -1,22 +1,26 @@
-from . import environment
-from .environment import set_default_connection, set_default_dataset_id
+# Copyright (c) 2012-2015 Kapiche Ltd.
+# Author: Ryan Stuart<ryan@kapiche.com>
+from __future__ import absolute_import, division, print_function, unicode_literals
+
+from .connection import ConnectionError, Connection, register_connection, DEFAULT_CONNECTION_NAME
+from .environment import determine_default_dataset_id
+from gcloudoem.datastore import credentials
 
 
-def set_defaults(dataset_id=None, connection=None):
+SCOPE = ('https://www.googleapis.com/auth/datastore', 'https://www.googleapis.com/auth/userinfo.email')
+"""The scopes required for authenticating as a Cloud Datastore consumer."""
+
+
+def connect(dataset_id=None):
     """
-    Set defaults either explicitly or implicitly as fall-back.
-
-    Uses the arguments to call the individual default methods
-    - set_default_dataset_id
-    - set_default_connection
-
-    In the future we will likely enable methods like
-    - set_default_namespace
+    Connect to Datastore dataset. If no dataset is given, we attempt to determine it given the environment.
 
     :param str dataset_id: Optional. The dataset ID to use as default.
-    :param :class:`gcloud.datastore.connection.Connection` connection: A connection provided to be the default.
     """
-    set_default_dataset_id(dataset_id=dataset_id)
-    set_default_connection(connection=connection)
-
-connect = set_defaults  # Just so we are more database like
+    if dataset_id is None:
+        dataset_id = determine_default_dataset_id()
+        if dataset_id is None:
+            raise ConnectionError("Couldn't determine the dataset id from the environment")
+    implicit_credentials = credentials.get_credentials()
+    scoped_credentials = implicit_credentials.create_scoped(SCOPE)
+    register_connection(DEFAULT_CONNECTION_NAME, dataset_id, scoped_credentials)

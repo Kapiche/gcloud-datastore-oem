@@ -15,8 +15,11 @@
 # CHANGED BY Kapiche Ltd.
 # Copyright 2015 Kapiche Ltd. All rights reserved.
 # Based on work by the good folk responsible for gcloud-python. Thanks folks!
+# Author: Ryan Stuart<ryan@kapiche.com>
 #
 """A simple wrapper around the OAuth2 credentials library."""
+from __future__ import absolute_import, division, print_function, unicode_literals
+
 import base64
 import calendar
 import datetime
@@ -34,7 +37,8 @@ from six.moves.urllib.parse import urlencode
 
 
 def get_credentials():
-    """Gets credentials implicitly from the current environment.
+    """
+    Gets credentials implicitly from the current environment.
 
     .. note::
       You should not need to use this function directly. Instead, use the helper method
@@ -72,7 +76,8 @@ def get_credentials():
 
 
 def get_for_service_account_json(json_credentials_path, scope=None):
-    """Gets the credentials for a service account with JSON key.
+    """
+    Gets the credentials for a service account with JSON key.
 
     :param str json_credentials_path: The path to a private key file (this file was given to you when you created the
         service account). This file must contain a JSON object with a private key and other credentials information
@@ -83,11 +88,10 @@ def get_for_service_account_json(json_credentials_path, scope=None):
         documentation for which scope is required for the different levels of access to any particular API.)
 
     :rtype: :class:`oauth2client.client.GoogleCredentials`,
-            :class:`oauth2client.service_account._ServiceAccountCredentials`
+        :class:`oauth2client.service_account._ServiceAccountCredentials`
     :returns: New service account or Google (for a user JSON key file) credentials object.
     """
-    credentials = _get_application_default_credential_from_file(
-        json_credentials_path)
+    credentials = _get_application_default_credential_from_file(json_credentials_path)
     if scope is not None:
         credentials = credentials.create_scoped(scope)
     return credentials
@@ -184,7 +188,8 @@ def _utcnow():  # pragma: NO COVER testing replaces
 
 
 def _get_expiration_seconds(expiration):
-    """Convert 'expiration' to a number of seconds in the future.
+    """
+    Convert 'expiration' to a number of seconds in the future.
 
     :type expiration: int, long, datetime.datetime, datetime.timedelta
     :param expiration: When the signed URL should expire.

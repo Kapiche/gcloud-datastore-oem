@@ -1,3 +1,5 @@
+# Copyright (c) 2012-2015 Kapiche Ltd.
+# Author: Ryan Stuart<ryan@kapiche.com>
 from __future__ import absolute_import
 
 import calendar
@@ -11,9 +13,8 @@ import zlib
 from google.protobuf.internal.type_checkers import Int64ValueChecker
 
 from .base.properties import BaseProperty
-from .datastore import datastore_v1_pb2 as datastore_pb
-from .datastore import environment
-from gcloudoem.key import Key
+from .datastore.connection import get_connection
+from .key import Key
 
 
 INT_VALUE_CHECKER = Int64ValueChecker()
@@ -73,16 +74,16 @@ class KeyProperty(BaseProperty):
         >>> e.key
         {'kind': 'Entity', 'id': 1}
     """
-    def __init__(self):
-        super(KeyProperty, self).__init__()
+    def __init__(self, name=None, db_name=None):
+        super(KeyProperty, self).__init__(name=name, db_name=db_name)
 
     def __get__(self, instance, owner):
         if not instance:
             return self
-        return instance._data.get(self.db_name)
+        return instance._data.get(self.name)
 
     def __set__(self, instance, value):
-        kind = instance.__class__.__name__
+        kind = instance._meta.kind
         parent = None
 
         # Is this a (parent, <value>) tuple?
@@ -93,21 +94,53 @@ class KeyProperty(BaseProperty):
             else:
                 value = None  # Partial key
 
-        instance._data[self.db_name] = Key(kind, parent=parent, value=value)
+        if isinstance(value, Key):
+            instance._data[self.name] = value
+        else:
+            instance._data[self.name] = Key(kind, parent=parent, value=value)
 
     def to_protobuf(self, value):
+        from .datastore import datastore_v1_pb2 as datastore_pb
         key = datastore_pb.Key()
-        key.partition_id.dataset_id = environment.get_default_dataset_id()
+
+        dataset_id = get_connection().dataset
+        if not dataset_id:
+            raise EnvironmentError("Couldn't determine the dataset ID. Have you called connect?")
+        key.partition_id.dataset_id = dataset_id
 
         for item in value.path:
             element = key.path_element.add()
-            element.kind = item['kind']
+            element.kind = item.kind
             if item.id:
-                element.id = item['id']
+                element.id = item.id
             elif item.name:
-                element.name = item['name']
+                element.name = item.name
 
         return key
+
+    def from_protobuf(self, pb_value):
+        """
+        Factory method for creating a key based on a protobuf.
+
+        The protobuf should be one returned from the Datastore protobuf API.
+
+        :type pb_value: :class:`gcloudoem.datastore.datastore_v1_pb2.Key`
+        :param pb_value: The Protobuf representing the key.
+
+        :rtype: :class:`gcloudoem.key.Key`
+        :returns: a new `Key` instance
+        """
+        last_key = None
+        for element in pb_value.path_element:
+            if element.HasField('id'):
+                key = Key(element.kind, parent=last_key, value=element.id)
+            elif element.HasField('name'):
+                key = Key(element.kind, parent=last_key, value=element.name)
+            else:
+                key = Key(element.kind, parent=last_key)
+            last_key = key
+
+        return last_key
 
 
 class IntegerProperty(BaseProperty):
@@ -288,14 +321,14 @@ class ListProperty(BaseProperty):
     .. note::
         Required means it cannot be empty - as the default for ListProperty is []
     """
-    def __init__(self, property=None, **kwargs):
+    def __init__(self, property, **kwargs):
         """
         :param :class:`~gcloudoem.base.properties.BaseProperty` property: The property class used as the value of the
             ``list`` items. Can't be a :class:`~gcloudoem.properties.KeyProperty`
         """
-        if not isinstance(property, BaseProperty):
+        if not issubclass(property, BaseProperty):
             raise TypeError('property must be a BaseProperty Instance')
-        if isinstance(property, (KeyProperty, ListProperty)):
+        if issubclass(property, (KeyProperty, ListProperty)):
             raise TypeError('property cannot be a KeyProperty or ListProperty')
         self.property = property
         kwargs.pop('default', lambda: [])

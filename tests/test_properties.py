@@ -1,11 +1,10 @@
-import six
 import unittest2 as unittest
 
 from gcloudoem import entity, properties, connect
-from gcloudoem.queryset.errors import ValidationError
+from gcloudoem.exceptions import ValidationError
 
 
-class Properties(unittest.TestCase):
+class TestProperties(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         connect("DATASET")
@@ -177,3 +176,10 @@ class Properties(unittest.TestCase):
 
         TEntity.test_time._validate(t)
         self.assertRaises(ValidationError, TEntity.test_time._validate, False)
+
+    def test_ListProperty(self):
+        class TEntity(entity.Entity):
+            test_time = properties.ListProperty(property=properties.TextProperty)
+
+        e = TEntity()
+        self.assertFalse(e.test_time)

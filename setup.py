@@ -1,3 +1,5 @@
+# Copyright (c) 2012-2015 Kapiche Ltd.
+# Author: Ryan Stuart<ryan@kapiche.com>
 import os
 from setuptools import setup, find_packages
 
@@ -45,7 +47,7 @@ setup(
         "six",
     ],
     extras_require={
-        'test': ['nose', 'coverage', 'unittest2'],
+        'test': ['nose', 'coverage', 'unittest2', 'django>=1.5.1', 'pyOpenSSL'],
     },
     package_data={
         'gcloudoem': ['VERSION'],
