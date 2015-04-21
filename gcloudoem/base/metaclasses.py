@@ -1,11 +1,18 @@
 # Copyright (c) 2012-2015 Kapiche Ltd.
 # Author: Ryan Stuart<ryan@kapiche.com>
 from __future__ import absolute_import
+import sys
 
 from ..exceptions import ObjectDoesNotExist, MultipleObjectsReturned
 from ..options import Options
 from ..queryset.manager import QuerySetManager
 from .properties import BaseProperty
+
+
+ENTITY_MODULE_NAMES = (
+    'models',  # Django style
+    'entities',
+)
 
 
 def subclass_exception(name, parents, module, attached_to=None):
@@ -77,6 +84,22 @@ class EntityMeta(type):
             meta = getattr(new_cls, 'Meta', None)
         else:
             meta = attr_meta
+
+        # Try to detect the app_label
+        if getattr(meta, 'app_label', None) is None:
+            entity_module = sys.modules[new_cls.__module__]
+            package_components = entity_module.__name__.split('.')
+            package_components.reverse()  # find the last occurrence of 'models' or 'entites'
+            app_label_index = -1
+            for name in ENTITY_MODULE_NAMES:
+                try:
+                    app_label_index = package_components.index(name)
+                    break
+                except ValueError:
+                    pass
+            if app_label_index > -1:
+                setattr(meta, "app_label", package_components[app_label_index + 1])
+
         _meta = Options(meta)
         _meta.contribute_to_class(new_cls, '_meta')
 

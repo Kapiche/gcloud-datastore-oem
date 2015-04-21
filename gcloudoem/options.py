@@ -22,6 +22,8 @@ class Options(object):
 
     You can access an instance on this class on any entity via the ``_meta`` attribute. The options are as follows:
 
+    * **app_label** - The label for the application an Entity belongs to. Used for the name of the Entity in Datastore.
+        Defaults to being empty.
     * **get_latest_by** - The name of an orderable property in the entity, typically a DateProperty, DateTimeProperty,
         or IntegerProperty. This specifies the default field to use in your model Manager’s latest() and earliest()
         methods.
@@ -56,6 +58,7 @@ class Options(object):
         self.queryset_class = None
         self.verbose_name = ''
         self.verbose_name_plural = ''
+        self.app_label = ''
 
         # Mostly internal things
         self.entity = None
@@ -64,9 +67,6 @@ class Options(object):
         self.meta = meta
 
     def contribute_to_class(self, cls, name):
-        from django.db import connection
-        from django.db.backends.utils import truncate_name
-
         cls._meta = self
         self.entity = cls
         # First, construct the default values for these options.
@@ -98,6 +98,10 @@ class Options(object):
             # verbose_name_plural is a special case because it uses a 's' by default.
             if self.verbose_name_plural is None:
                 self.verbose_name_plural = self.verbose_name + 's'
+
+            # Prepend the app_label to the kind
+            if self.app_label != '':
+                self.kind = "%s_%s" % (self.app_label, self.kind)
 
             # Any leftover attributes must be invalid.
             if meta_attrs != {}:

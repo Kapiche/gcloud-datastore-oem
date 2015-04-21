@@ -179,7 +179,37 @@ class TestProperties(unittest.TestCase):
 
     def test_ListProperty(self):
         class TEntity(entity.Entity):
-            test_time = properties.ListProperty(property=properties.TextProperty)
+            test_list = properties.ListProperty(property=properties.TextProperty())
 
         e = TEntity()
-        self.assertFalse(e.test_time)
+        self.assertFalse(e.test_list)
+
+        l = ['a', 'b']
+        e.test_list = l[:]
+        self.assertEqual(l, e.test_list)
+
+        TEntity.test_list._validate(l)
+        self.assertRaises(ValidationError, TEntity.test_list._validate, False)
+
+    def test_ReferenceProperty(self):
+        class TEntity(entity.Entity):
+            name = properties.TextProperty()
+
+        class TRefEntity(entity.Entity):
+            test_ref = properties.ReferenceProperty(TEntity)
+
+        e1 = TEntity(name='Alice')
+        e2 = TRefEntity(test_ref=e1)
+
+        self.assertRaises(ValidationError, TRefEntity.test_ref._validate, e1)
+
+    def test_EmailProperty(self):
+        class TEntity(entity.Entity):
+            email = properties.EmailProperty()
+
+        e = TEntity()
+        e.email = 'alice@bob.com'
+        self.assertEqual('alice@bob.com', e.email)
+
+        TEntity.email._validate(e.email)
+        self.assertRaises(ValidationError, TEntity.email._validate, '@not_an_email')

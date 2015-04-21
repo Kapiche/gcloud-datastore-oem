@@ -127,3 +127,29 @@ class BaseProperty(object):
         """Raises a ValidationError."""
         field_name = field_name if field_name else self.name
         raise ValidationError(message, errors=errors, field_name=field_name)
+
+
+class ContainerBaseProperty(BaseProperty):
+    """
+    A ContainerBaseProperty is designed for use with any property that is meant to be a container of other properties
+    (like a list for example). It handles correctly fetching things like ReferenceProperties etc.
+
+    Subclasses of this class must have a ``property`` attribute which contains the BaseProperty instance this class is a
+    container for.
+    """
+    def __get__(self, instance, owner):
+        if not instance:  # being called on entity calss
+            return self
+
+        value = super(ContainerBaseProperty, self).__get__(instance, owner)
+
+        if isinstance(value, (list, tuple)):
+            from ..properties import ReferenceProperty
+
+            if self.property and isinstance(self.property, ReferenceProperty):
+                from .. import Entity, Key
+                for i, k in enumerate(value):
+                    if not isinstance(k, Entity):
+                        value[i] = self.property.entity_cls.objects.get(pk=k.name_or_id)
+                setattr(instance, self.name, value)  # cache any fetched entities
+            return value
