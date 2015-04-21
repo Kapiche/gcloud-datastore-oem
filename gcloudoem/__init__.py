@@ -5,7 +5,7 @@ from __future__ import absolute_import
 from io import open
 import os
 
-from .datastore import credentials, connection, environment, utils, connect
+from .datastore import credentials, connection, environment, utils, connect, query
 from .entity import *
 from .properties import *
 
