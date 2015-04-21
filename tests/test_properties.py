@@ -1,10 +1,10 @@
-import six
 import unittest2 as unittest
 
 from gcloudoem import entity, properties, connect
+from gcloudoem.exceptions import ValidationError
 
 
-class Properties(unittest.TestCase):
+class TestProperties(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         connect("DATASET")
@@ -29,6 +29,9 @@ class Properties(unittest.TestCase):
         self.assertTrue(e.test_bool)
         self.assertIsInstance(TEntity.test_bool, properties.BooleanProperty)
 
+        TEntity.test_bool._validate(True)
+        self.assertRaises(ValidationError, TEntity.test_bool._validate, 1)
+
     def test_IntegerProperty(self):
         class TEntity(entity.Entity):
             test_int = properties.IntegerProperty()
@@ -45,6 +48,9 @@ class Properties(unittest.TestCase):
         self.assertEqual(e.test_int, 4)
         self.assertIsInstance(TEntity.test_int, properties.IntegerProperty)
 
+        TEntity.test_int._validate(1)
+        self.assertRaises(ValidationError, TEntity.test_int._validate, '')
+
     def test_FloatProperty(self):
         class TEntity(entity.Entity):
             test_float = properties.FloatProperty()
@@ -60,6 +66,9 @@ class Properties(unittest.TestCase):
         e.test_float = 0.2
         self.assertEqual(e.test_float, 0.2)
         self.assertIsInstance(TEntity.test_float, properties.FloatProperty)
+
+        TEntity.test_float._validate(1.1)
+        self.assertRaises(ValidationError, TEntity.test_float._validate, '')
 
     def test_TextProperty(self):
         class TEntity(entity.Entity):
@@ -80,6 +89,9 @@ class Properties(unittest.TestCase):
         e = TEntity()
         self.assertEqual(e.test_text, "")
         self.assertIsInstance(TEntity.test_text, properties.TextProperty)
+
+        TEntity.test_text._validate('abc')
+        self.assertRaises(ValidationError, TEntity.test_text._validate, b'blah')
 
     def test_PickleProperty(self):
         class TEntity(entity.Entity):
@@ -127,6 +139,9 @@ class Properties(unittest.TestCase):
         e = TEntity()
         self.assertEqual(e.test_datetime, utcnow)
 
+        TEntity.test_datetime._validate(utcnow)
+        self.assertRaises(ValidationError, TEntity.test_datetime._validate, False)
+
     def test_DateProperty(self):
         import datetime
 
@@ -142,6 +157,9 @@ class Properties(unittest.TestCase):
 
         self.assertIsInstance(TEntity.test_date, properties.DateProperty)
 
+        TEntity.test_date._validate(today)
+        self.assertRaises(ValidationError, TEntity.test_date._validate, False)
+
     def test_TimeProperty(self):
         import datetime
 
@@ -155,3 +173,43 @@ class Properties(unittest.TestCase):
         e.test_time = t
         self.assertEqual(e.test_time, t)
         self.assertIsInstance(TEntity.test_time, properties.TimeProperty)
+
+        TEntity.test_time._validate(t)
+        self.assertRaises(ValidationError, TEntity.test_time._validate, False)
+
+    def test_ListProperty(self):
+        class TEntity(entity.Entity):
+            test_list = properties.ListProperty(property=properties.TextProperty())
+
+        e = TEntity()
+        self.assertFalse(e.test_list)
+
+        l = ['a', 'b']
+        e.test_list = l[:]
+        self.assertEqual(l, e.test_list)
+
+        TEntity.test_list._validate(l)
+        self.assertRaises(ValidationError, TEntity.test_list._validate, False)
+
+    def test_ReferenceProperty(self):
+        class TEntity(entity.Entity):
+            name = properties.TextProperty()
+
+        class TRefEntity(entity.Entity):
+            test_ref = properties.ReferenceProperty(TEntity)
+
+        e1 = TEntity(name='Alice')
+        e2 = TRefEntity(test_ref=e1)
+
+        self.assertRaises(ValidationError, TRefEntity.test_ref._validate, e1)
+
+    def test_EmailProperty(self):
+        class TEntity(entity.Entity):
+            email = properties.EmailProperty()
+
+        e = TEntity()
+        e.email = 'alice@bob.com'
+        self.assertEqual('alice@bob.com', e.email)
+
+        TEntity.email._validate(e.email)
+        self.assertRaises(ValidationError, TEntity.email._validate, '@not_an_email')

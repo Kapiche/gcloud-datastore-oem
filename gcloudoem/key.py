@@ -21,6 +21,7 @@ class Key(object):
         """
         Initialise a new key.
 
+        :param str kind: The Datastore king of this key.
         :param :class:`Key` parent: The parent of this key.
         :param int or st value: the name or id of this key.
         """

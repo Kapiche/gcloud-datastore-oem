@@ -1,6 +1,8 @@
+# Copyright (c) 2012-2015 Kapiche Ltd.
+# Author: Ryan Stuart<ryan@kapiche.com>
 from __future__ import absolute_import
 
-from ..queryset.errors import ValidationError
+from ..exceptions import ValidationError
 
 
 NON_FIELD_ERRORS = '__all__'
@@ -57,5 +59,17 @@ class BaseEntity(object):
                 errors[field.name] = error
 
         if errors:
-            message = "ValidationError (%s:%s) " % (self.__class__, self.key)
+            message = "ValidationError (%s:%s) " % (self.__class__, self.key.name_or_id)
             raise ValidationError(message, errors=errors)
+
+    @classmethod
+    def from_protobuf(cls, pb):
+        """
+        Get an instance of this class based on the protobug representation from the Datastore API.
+
+        :type pb: :class:`gcloudoem.datastore.datastore_v1_pb2.Entity`
+        :param pb: The protobuf representing the entity.
+
+        :return: Instance of cls.
+        """
+        raise NotImplementedError

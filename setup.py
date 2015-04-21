@@ -1,3 +1,5 @@
+# Copyright (c) 2012-2015 Kapiche Ltd.
+# Author: Ryan Stuart<ryan@kapiche.com>
 import os
 from setuptools import setup, find_packages
 
@@ -11,7 +13,7 @@ with open(os.path.join(os.path.dirname(__file__), 'gcloudoem', 'VERSION')) as fh
     version = fh.read().strip()
 
 setup(
-    name='gcloud-datastore-oem',
+    name='gcloudoem',
     version=version,
     description='gcloud-datastore-oem is a Python Object-Entity Mapper for working with Google Datastore.',
     long_description=long_description,
@@ -45,7 +47,8 @@ setup(
         "six",
     ],
     extras_require={
-        'test': ['nose', 'coverage', 'unittest2'],
+        'test': ['nose', 'coverage', 'unittest2', 'django>=1.5.1', 'pyOpenSSL'],
+        'test-py2': ['nose', 'coverage', 'unittest2', 'django>=1.5.1', 'pyOpenSSL', 'mock'],
     },
     package_data={
         'gcloudoem': ['VERSION'],
