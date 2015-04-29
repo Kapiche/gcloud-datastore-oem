@@ -182,12 +182,9 @@ class ReferenceProperty(BaseProperty):
         return pickle.loads(data)
 
     def to_protobuf(self, value):
-        data = six.BytesIO()
-        pickler = pickle.Pickler(data, protocol=2)  # Support both Python 2 and 3
         if isinstance(value, self.entity_cls):
             value = value.key
-        pickler.dump(value)
-        return "blob_value", data.getvalue()
+        return "blob_value", pickle.dumps(value, protocol=2)  # Py2 compatible
 
     def validate(self, value):
         if not isinstance(value, (self.entity_cls, Key)):
@@ -263,6 +260,10 @@ class TextProperty(BlobProperty):
         super(TextProperty, self).__init__(**kwargs)
         self._max_length = max_length
 
+    @property
+    def max_length(self):
+        return self._max_length
+
     def from_protobuf(self, pb_value):
         value = pb_value.string_value
         if isinstance(value, six.binary_type):
@@ -271,14 +272,14 @@ class TextProperty(BlobProperty):
 
     def to_protobuf(self, value):
         if isinstance(value, six.binary_type):
-            return value.decode('utf-8')
+            value = value.decode('utf-8')
         return 'string_value', value
 
     def validate(self, value):
-        if not isinstance(value, six.text_type):
+        if not isinstance(value, six.string_types):
             self.error('Value must be str (unicode in Python 2)')
-        if self._max_length and len(value) > self._max_length:
-            self.error('Value exceeds maximum length of %d' % self._max_length)
+        if self.max_length and len(value) > self.max_length:
+            self.error('Value exceeds maximum length of %d' % self.max_length)
         return value
 
 
@@ -444,11 +445,22 @@ class EmailProperty(TextProperty):
 
 class PickleProperty(BlobProperty):
     """Store data as pickle. Takes care of (un)pickling."""
-    def to_datastore_value(self, value):
-        return super(PickleProperty, self).to_datastore_value(pickle.dumps(value, pickle.HIGHEST_PROTOCOL))
+    def to_protobuf(self, value):
+        return super(PickleProperty, self).to_protobuf(pickle.dumps(value, protocol=2))  # Py2 compatible
 
-    def to_python_value(self, value):
-        return pickle.loads(super(PickleProperty, self)._from_base_type(value))
+    def from_protobuf(self, pb_value):
+        return pickle.loads(super(PickleProperty, self).from_protobuf(pb_value))
+
+
+class DictProperty(PickleProperty):
+    """
+    Store a python dict.
+
+    Dict is pickled for storage.
+    """
+    def validate(self, value):
+        if not isinstance(value, dict):
+            self.error("Value for a DictProperty must be a dict instance. Got %s instead." % type(value))
 
 
 class JsonProperty(BlobProperty):

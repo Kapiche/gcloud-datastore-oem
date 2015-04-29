@@ -121,7 +121,8 @@ class BaseProperty(object):
         if self.required and value is None:
             self.error('Value is required.')
 
-        self.validate(value)
+        if value is not None:
+            self.validate(value)
 
     def error(self, message="", errors=None, field_name=None):
         """Raises a ValidationError."""

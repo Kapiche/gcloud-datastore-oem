@@ -23,7 +23,7 @@ Connections to gcloud Datastore API servers.
 This module also handles connections via :func:`.register_connection` and :func:`.get_connection`. Right now, this isn't
 used internally but could be later on.
 """
-from __future__ import absolute_import, division, print_function, unicode_literals
+from __future__ import absolute_import, division, print_function
 
 import os
 

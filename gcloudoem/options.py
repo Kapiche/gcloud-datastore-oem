@@ -25,15 +25,15 @@ class Options(object):
     * **app_label** - The label for the application an Entity belongs to. Used for the name of the Entity in Datastore.
         Defaults to being empty.
     * **get_latest_by** - The name of an orderable property in the entity, typically a DateProperty, DateTimeProperty,
-        or IntegerProperty. This specifies the default field to use in your model Manager’s latest() and earliest()
+        or IntegerProperty. This specifies the default field to use in your model Manager's latest() and earliest()
         methods.
     * **indexed_properties** - Which properties should be indexed in Datastore? This should be a tuple or list of string
         property names. Defaults to all properties.
     * **kind** - What kind should be used to store this in datastore. Defaults to the Entity class name.
     * **namespace** - The namespace to use with Datastore. By default it is blank.
     * **ordering** - The default ordering for the entity, for use when obtaining lists of entities. This is a tuple or
-        list of strings. Each string is a property name with an optional “-” prefix, which indicates descending order.
-        Fields without a leading “-” will be ordered ascending. Use the string ”?” to order randomly.
+        list of strings. Each string is a property name with an optional "-" prefix, which indicates descending order.
+        Fields without a leading "-" will be ordered ascending. Use the string "?" to order randomly.
     * **queryset_class** - The class to use as the query set. Can be used to override the one set by the manager.
     * **verbose_name** - A human-readable name for the entity, singular. Defaults to a a munged version of the class
         name: CamelCase becomes camel case.

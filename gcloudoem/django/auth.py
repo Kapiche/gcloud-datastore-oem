@@ -139,7 +139,8 @@ class Group(Entity):
     things to those users -- such as giving them access to a members-only portion of your site, or sending them
     members-only e-mail messages.
     """
-    name = TextProperty(max_length=80, unique=True, verbose_name=_('name'))
+    # name = TextProperty(max_length=80, unique=True, verbose_name=_('name'))
+    name = TextProperty(max_length=80, verbose_name=_('name'))
     permissions = ListProperty(ReferenceProperty(Permission, verbose_name=_('permissions'), required=False))
 
     class Meta:
@@ -240,13 +241,6 @@ class User(Entity):
 
     USERNAME_FIELD = 'username'
     REQUIRED_FIELDS = ['email']
-
-    meta = {
-        'allow_inheritance': True,
-        'indexes': [
-            {'fields': ['username'], 'unique': True, 'sparse': True}
-        ]
-    }
 
     def __unicode__(self):
         return self.username

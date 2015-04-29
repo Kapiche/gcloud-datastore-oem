@@ -1,7 +1,9 @@
 # Copyright (c) 2012-2015 Kapiche Ltd.
 # Author: Ryan Stuart<ryan@kapiche.com>
+from io import open
 import os
 from setuptools import setup, find_packages
+import sys
 
 
 with open('README.rst', encoding='utf-8') as f:
@@ -11,6 +13,27 @@ with open('README.rst', encoding='utf-8') as f:
 # Use the VERSION file to get caterpillar version
 with open(os.path.join(os.path.dirname(__file__), 'gcloudoem', 'VERSION')) as fh:
     version = fh.read().strip()
+
+if sys.version_info >= (3, 0):
+    install_requires = [
+        "future",
+        "httplib2",
+        "oauth2client >= 1.4.7",
+        "protobuf >= 3.0.0a1",  # Need Python 3 support
+        "pycrypto",
+        "pytz",
+        "six",
+    ]
+else:
+    install_requires = [
+        "future",
+        "httplib2",
+        "oauth2client >= 1.4.7",
+        "protobuf",
+        "pycrypto",
+        "pytz",
+        "six",
+    ]
 
 setup(
     name='gcloudoem',
@@ -37,15 +60,7 @@ setup(
         'Topic :: Software Development :: Libraries :: Python Modules',
     ],
     packages=find_packages(exclude=["tests*", "docs*"]),
-    install_requires=[
-        "future",
-        'httplib2',
-        'oauth2client >= 1.4.7',
-        'protobuf >= 3.0.0a1',  # Need Python 3 support
-        'pycrypto',
-        'pytz',
-        "six",
-    ],
+    install_requires=install_requires,
     extras_require={
         'test': ['nose', 'coverage', 'unittest2', 'django>=1.5.1', 'pyOpenSSL'],
         'test-py2': ['nose', 'coverage', 'unittest2', 'django>=1.5.1', 'pyOpenSSL', 'mock'],

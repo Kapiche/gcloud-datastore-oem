@@ -9,8 +9,6 @@ NON_FIELD_ERRORS = '__all__'
 
 
 class BaseEntity(object):
-    __slots__ = ('_data', '_properties',)
-
     def __init__(self, **kwargs):
         """
         Initialise an entity. Values for an entity's properties can be passed as keyword or positional arguments.

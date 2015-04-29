@@ -227,8 +227,6 @@ class Transaction(object):
 
         :type entity: :class:`~gcloud.entity.Entity`
         :param entity: the entity to be saved.
-
-        :raises: ValueError if entity has no key assigned
         """
         if entity.key is None:
             raise ValueError("Entity must have a key")

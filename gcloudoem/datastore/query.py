@@ -18,7 +18,7 @@
 # Author: Ryan Stuart<ryan@kapiche.com>
 #
 """Create / interact with gcloud datastore queries."""
-from __future__ import absolute_import, division, print_function, unicode_literals
+from __future__ import absolute_import, division, print_function
 
 import base64
 
@@ -28,7 +28,6 @@ from . import datastore_v1_pb2 as datastore_pb, utils
 from .connection import get_connection
 from ..exceptions import InvalidQueryError
 from ..key import Key
-from ..properties import KeyProperty
 from .transaction import Transaction
 
 
