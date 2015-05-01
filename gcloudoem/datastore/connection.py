@@ -32,33 +32,43 @@ from . import datastore_v1_pb2 as datastore_pb
 from ..exceptions import ConnectionError, make_exception
 
 
+DEFAULT_NAMESPACE = 'default'
+
 _GCD_HOST_ENV_VAR_NAME = 'DATASTORE_HOST'
-DEFAULT_CONNECTION_NAME = 'default'
 
 _connections = {}
+_default_connection = None
 
 
-def register_connection(alias, dataset, credentials):
+def register_connection(dataset, namespace, credentials):
     """Shortcut to create a new connection."""
-    global _connections
+    global _connections, _default_connection
 
-    _connections[alias] = Connection(dataset, credentials)
+    connection = Connection(dataset, namespace, credentials)
+    _connections[namespace] = connection
+    _default_connection = connection
 
 
-def get_connection(alias=DEFAULT_CONNECTION_NAME):
-    global _connections
+def get_connection(alias=None):
+    global _connections, _default_connection
 
-    if alias not in _connections:
-        msg = 'Connection with alias "%s" has not been defined' % alias
-        if alias == DEFAULT_CONNECTION_NAME:
-            msg = 'You have not defined a default connection'
-        raise ConnectionError(msg)
-    return _connections[alias]
+    if alias is None:
+        if _default_connection is None:
+            raise ConnectionError('There is no active connection.')
+        return _default_connection
+
+    try:
+        return _connections[alias]
+    except KeyError:
+        raise ConnectionError('Connection with alias "%s" has not been defined' % alias)
 
 
 def disconnect():
     """Remove all connections."""
+    global _connections, _default_connection
+
     _connections.clear()
+    _default_connection = None
 
 
 class Connection(BaseConnection):
@@ -75,9 +85,10 @@ class Connection(BaseConnection):
     API_URL_TEMPLATE = ('{api_base}/datastore/{api_version}/datasets/{dataset_id}/{method}')
     """A template for the URL of a particular API call."""
 
-    def __init__(self, dataset_id, credentials=None, http=None, api_base_url=None):
+    def __init__(self, dataset_id, namespace, credentials=None, http=None, api_base_url=None):
         """
         :param str dataset_id: The gcloud Datastore dataset identified.
+        :param str namespace: The gcloud Datastore namesapce to use.
         :param :class:`oauth2client.client.OAuth2Credentials` credentials: The OAuth2 Credentials to use for this
             connection.
         :param http: A class to use instead of :class:`httplib2.Http` for calling the API. Needs to have a ``request``
@@ -85,7 +96,7 @@ class Connection(BaseConnection):
         :param str api_base_url: The base of the API call URL. Defaults to
             :attr:`~gcloudoem.datastore.base.BaseConnection.API_BASE_URL`.
         """
-        super(Connection, self).__init__(dataset_id, credentials=credentials, http=http)
+        super(Connection, self).__init__(dataset_id, namespace, credentials=credentials, http=http)
         if api_base_url is None:
             api_base_url = os.getenv(_GCD_HOST_ENV_VAR_NAME, BaseConnection.API_BASE_URL)
         self.api_base_url = api_base_url

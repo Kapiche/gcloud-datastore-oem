@@ -108,6 +108,7 @@ class KeyProperty(BaseProperty):
         if not dataset_id:
             raise EnvironmentError("Couldn't determine the dataset ID. Have you called connect?")
         key.partition_id.dataset_id = dataset_id
+        key.partition_id.namespace = get_connection().namespace
 
         for item in value.path:
             element = key.path_element.add()

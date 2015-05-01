@@ -136,6 +136,7 @@ class TestTransaction(unittest2.TestCase):
     def test_txn_commit_w_auto_ids(self):
         connection = MagicMock(spec=Connection)
         connection.dataset = 'DATASET'
+        connection.namespace = 'TEST'
         with patch('gcloudoem.properties.get_connection', return_value=connection):
             resp = datastore_pb.CommitResponse()
             resp.mutation_result.insert_auto_id_key.extend([self._make_key_pb()])

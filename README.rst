@@ -16,7 +16,7 @@ Quickstart
         address = TextProperty(default='blah')
         te = ListProperty(ReferenceProperty(TestEntity))
 
-    connect('dataset_id')
+    connect(dataset_id='dataset_id', namespace='demo')
 
     es = TestEntity.objects.filter(name='Alice')
     oe = OtherTestEntity(te=[e for e in es])

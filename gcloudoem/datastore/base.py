@@ -57,10 +57,13 @@ class BaseConnection(object):
     USER_AGENT = "gcloud-datastore-oem"
     """The user agent for requests."""
 
-    def __init__(self, dataset, credentials=None, http=None):
+    def __init__(self, dataset, namespace, credentials=None, http=None):
         """
         :type dataset: str
         :param dataset: The gcloud Datastore dataset identifier.
+
+        :type namespace: str
+        :param namespace: The gcloud Datastore namespace to use.
 
         :type credentials: :class:`oauth2client.client.OAuth2Credentials` or :class:`NoneType`
         :param credentials: The OAuth2 Credentials to use for this connection.
@@ -69,12 +72,17 @@ class BaseConnection(object):
         :param http: An optional HTTP object to make requests.
         """
         self._dataset = dataset
+        self._namespace = namespace
         self._http = http
         self._credentials = credentials
 
     @property
     def dataset(self):
         return self._dataset
+
+    @property
+    def namespace(self):
+        return self._namespace
 
     @property
     def credentials(self):

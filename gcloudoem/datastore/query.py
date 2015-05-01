@@ -53,15 +53,13 @@ class Query(object):
     }
     """Mapping of operator strs and their protobuf equivalents."""
 
-    def __init__(self, entity, namespace=None, ancestor=None, filters=(), projection=(), order=(), group_by=(),
+    def __init__(self, entity, ancestor=None, filters=(), projection=(), order=(), group_by=(),
                  limit=None, offset=0):
         """
         Initialise a new Query.
 
         :type entity: type
         :param entity: The entity class to use for the query. Used to derive the ``kind`` passed to datastore.
-
-        :param str namespace: The namespace to which to restrict results (optional).
 
         :type ancestor: :class:`~gcloudoem.entity.Entity` or None
         :param ancestor: the ancestor to which this query's results are restricted.
@@ -84,9 +82,6 @@ class Query(object):
 
         :type offset: int
         :param offset: the offset into the results the first entity should be. Defaults to 0.
-
-        :raises :class:`~gcloudoem.exceptions.EnvironmentError`: If you aren't connected to datastore (and hence there
-            is no dataset_id).
         """
         from gcloudoem import Entity
 
@@ -94,7 +89,6 @@ class Query(object):
             raise ValueError('You must pass a valid entity class to query (one that subclasses Entity)')
 
         self._entity = entity
-        self._namespace = namespace
         self._ancestor = ancestor
         self._filters = list(filters)
         self._projection = list(projection)
@@ -128,26 +122,6 @@ class Query(object):
     def is_limited(self):
         """Has an offset or limit been applied to this query?"""
         return bool(self._offset or self._limit)
-
-    @property
-    def namespace(self):
-        """
-        This query's namespace
-
-        :rtype: str or None
-        """
-        return self._namespace
-
-    @namespace.setter
-    def namespace(self, value):
-        """
-        Update the query's namespace.
-
-        :type value: str
-        """
-        if not isinstance(value, six.text_type):
-            raise ValueError("Namespace must be a str")
-        self._namespace = value
 
     @property
     def entity(self):
@@ -354,7 +328,7 @@ class Query(object):
 
     def clone(self):
         return self.__class__(
-            self._entity, self._namespace, self._ancestor, self.filters, self.projection, self.order, self.group_by,
+            self._entity, self._ancestor, self.filters, self.projection, self.order, self.group_by,
             self._limit, self._offset
         )
 
@@ -472,7 +446,7 @@ class Cursor(object):
 
         query_results = self._connection.run_query(
             query_pb=pb,
-            namespace=self._query.namespace,
+            namespace=self._connection.namespace,
             transaction_id=transaction and transaction.id,
         )
         # NOTE: `query_results` contains an extra value that we don't use, namely `skipped_results`.
