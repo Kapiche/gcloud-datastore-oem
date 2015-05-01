@@ -50,7 +50,6 @@ class TestQuery(unittest2.TestCase):
     def test_query_init_default(self):
         query = Query(self.TestEntity)
         self.assertEqual(query.entity, self.TestEntity)
-        self.assertEqual(query.namespace, None)
         self.assertEqual(query.ancestor, None)
         self.assertEqual(query.filters, [])
         self.assertEqual(query.projection, [])
@@ -59,36 +58,22 @@ class TestQuery(unittest2.TestCase):
 
     def test_query_init_args(self):
         ENTITY = self.TestEntity
-        _NAMESPACE = 'NAMESPACE'
         FILTERS = [('foo', '=', 'Qux'), ('bar', '<', 17)]
         PROJECTION = ['foo', 'bar', 'baz']
         ORDER = ['foo', 'bar']
         GROUP_BY = ['foo']
         query = Query(
             entity=ENTITY,
-            namespace=_NAMESPACE,
             filters=FILTERS,
             projection=PROJECTION,
             order=ORDER,
             group_by=GROUP_BY,
         )
         self.assertEqual(query.entity, self.TestEntity)
-        self.assertEqual(query.namespace, _NAMESPACE)
         self.assertEqual(query.filters, FILTERS)
         self.assertEqual(query.projection, PROJECTION)
         self.assertEqual(query.order, ORDER)
         self.assertEqual(query.group_by, GROUP_BY)
-
-    def test_namespace_setter_non_string(self):
-        query = Query(self.TestEntity)
-        self.assertRaises(ValueError, query.namespace, object())
-
-    def test_namespace_setter(self):
-        NAMESPACE = 'NAMESPACE'
-        query = Query(self.TestEntity)
-        query.namespace = NAMESPACE
-        self.assertEqual(query.entity, self.TestEntity)
-        self.assertEqual(query.namespace, NAMESPACE)
 
     def test_add_filter_setter_unknown_operator(self):
         query = Query(self.TestEntity)
@@ -288,6 +273,7 @@ class TestQuery(unittest2.TestCase):
     def test_query_pb_filter_key(self):
         connection = MagicMock(spec=Connection)
         connection.dataset = 'DATASET'
+        connection.namespace = 'TEST'
         with patch('gcloudoem.properties.get_connection', return_value=connection):
             key = Key(self.TestEntity._meta.kind, value=123)
             query = Query(self.TestEntity, filters=[('key', '=', key)])
@@ -321,8 +307,8 @@ class TestCursor(unittest2.TestCase):
         first_name = TextProperty()
 
     _DATASET = 'DATASET'
+    _NAMESPACE = 'NAMESPACE'
     _ID = 1234
-    _NAMESPACE = "NAMESPACE"
     _START = b'\x00'
     _END = b'\xFF'
     _MORE = datastore_pb.QueryResultBatch.NOT_FINISHED
@@ -360,6 +346,7 @@ class TestCursor(unittest2.TestCase):
     def test_next_page_no_cursors_no_more(self):
         attrs = {'run_query.return_value': self._addQueryResults()}
         connection = MagicMock(spec=Connection, **attrs)
+        connection.namespace = self._NAMESPACE
         query = Query(self.TestEntity)
         cursor = Cursor(query, connection)
         entities, more_results, position = cursor.next_page()
@@ -375,13 +362,14 @@ class TestCursor(unittest2.TestCase):
         qpb.offset = 0
         self.assertEqual(
             connection.method_calls,
-            [call.run_query(query_pb=qpb, namespace=query._namespace, transaction_id=None,)]
+            [call.run_query(query_pb=qpb, namespace=self._NAMESPACE, transaction_id=None,)]
         )
 
     def test_next_page_no_cursors_no_more_w_offset_and_limit(self):
         attrs = {'run_query.return_value': self._addQueryResults()}
         connection = MagicMock(spec=Connection, **attrs)
-        query = Query(self.TestEntity, namespace=self._NAMESPACE)
+        connection.namespace = self._NAMESPACE
+        query = Query(self.TestEntity)
         cursor = Cursor(query, connection, limit=13, offset=29)
         entities, more_results, position = cursor.next_page()
 
@@ -397,13 +385,14 @@ class TestCursor(unittest2.TestCase):
         qpb.offset = 29
         self.assertEqual(
             connection.method_calls,
-            [call.run_query(query_pb=qpb, namespace=query._namespace, transaction_id=None,)]
+            [call.run_query(query_pb=qpb, namespace=self._NAMESPACE, transaction_id=None,)]
         )
 
     def test_next_page_w_cursors_w_more(self):
         attrs = {'run_query.return_value': self._addQueryResults(more=True)}
         connection = MagicMock(spec=Connection, **attrs)
-        query = Query(self.TestEntity, namespace=self._NAMESPACE)
+        connection.namespace = self._NAMESPACE
+        query = Query(self.TestEntity)
         cursor = Cursor(query, connection, start_cursor=self._START, end_cursor=self._END)
         entities, more_results, position = cursor.next_page()
 
@@ -422,20 +411,21 @@ class TestCursor(unittest2.TestCase):
         qpb.end_cursor = b64decode(self._END)
         self.assertEqual(
             connection.method_calls,
-            [call.run_query(query_pb=qpb, namespace=query._namespace, transaction_id=None,)]
+            [call.run_query(query_pb=qpb, namespace=self._NAMESPACE, transaction_id=None,)]
         )
 
     def test_next_page_w_cursors_w_bogus_more(self):
         epb, position, _ = self._addQueryResults(cursor=self._END, more=True)
         attrs = {'run_query.return_value': (epb, position, 4)}
         connection = MagicMock(spec=Connection, **attrs)
-        query = Query(self.TestEntity, namespace=self._NAMESPACE)
+        query = Query(self.TestEntity)
         cursor = Cursor(query, connection)
         self.assertRaises(RuntimeError, cursor.next_page)
 
     def test___iter___no_more(self):
         attrs = {'run_query.return_value': self._addQueryResults()}
         connection = MagicMock(spec=Connection, **attrs)
+        connection.namespace = self._NAMESPACE
         query = Query(self.TestEntity)
         cursor = Cursor(query, connection)
         entities = list(cursor)
@@ -449,12 +439,13 @@ class TestCursor(unittest2.TestCase):
         qpb.offset = 0
         self.assertEqual(
             connection.method_calls,
-            [call.run_query(query_pb=qpb, namespace=query._namespace, transaction_id=None,)]
+            [call.run_query(query_pb=qpb, namespace=self._NAMESPACE, transaction_id=None,)]
         )
 
     def test___iter___w_more(self):
         attrs = {'run_query.return_value': self._addQueryResults(cursor=self._END, more=True)}
         connection = MagicMock(spec=Connection, **attrs)
+        connection.namespace = self._NAMESPACE
         query = Query(self.TestEntity)
         cursor = Cursor(query, connection)
         it = iter(cursor)
@@ -482,7 +473,7 @@ class TestCursor(unittest2.TestCase):
         self.assertEqual(
             connection.method_calls,
             [
-                call.run_query(query_pb=qpb1, namespace=query._namespace, transaction_id=None,),
-                call.run_query(query_pb=qpb2, namespace=query._namespace, transaction_id=None,)
+                call.run_query(query_pb=qpb1, namespace=self._NAMESPACE, transaction_id=None,),
+                call.run_query(query_pb=qpb2, namespace=self._NAMESPACE, transaction_id=None,)
             ]
         )

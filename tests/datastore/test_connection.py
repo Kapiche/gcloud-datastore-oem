@@ -32,6 +32,7 @@ from gcloudoem.datastore.connection import disconnect
 
 class TestConnection(unittest2.TestCase):
     DATASET = 'DATASET'
+    NAMESPACE = 'TEST'
 
     @classmethod
     def setUpClass(cls):
@@ -58,7 +59,7 @@ class TestConnection(unittest2.TestCase):
         return pb
 
     def _makeOne(self, *args, **kw):
-        return self._getTargetClass()(self.DATASET, *args, **kw)
+        return self._getTargetClass()(self.DATASET, self.NAMESPACE, *args, **kw)
 
     def _verifyProtobufCall(self, called_with, URI, conn):
         self.assertEqual(called_with['uri'], URI)
