@@ -62,6 +62,7 @@ setup(
     packages=find_packages(exclude=["tests*", "docs*"]),
     install_requires=install_requires,
     extras_require={
+        'dev': ['sphinx', 'sphinx_rtd_theme'],
         'test': ['nose', 'coverage', 'unittest2', 'django>=1.5.1', 'pyOpenSSL'],
         'test-py2': ['nose', 'coverage', 'unittest2', 'django>=1.5.1', 'pyOpenSSL', 'mock'],
     },

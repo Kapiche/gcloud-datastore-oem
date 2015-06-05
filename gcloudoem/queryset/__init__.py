@@ -90,7 +90,7 @@ class QuerySet(object):
             return list(qs)[::k.step] if k.step else qs
         # Integer index provided
         elif isinstance(k, six.integer_types):
-            self._query.limit = k
+            self._query.limit = k + 1  # Lists are 0 indexed
             return list(self._query())[k]
 
     def __iter__(self):
@@ -387,7 +387,7 @@ class QuerySet(object):
         assert not negate, "Exclude not supported yet"
 
         clone = self._clone()
-        filters = convert_lookups(*args, **kwargs)
+        filters = convert_lookups(**kwargs)
         for f in filters:
             clone._query.add_filter(*f)
         return clone
