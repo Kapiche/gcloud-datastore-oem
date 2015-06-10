@@ -1,5 +1,7 @@
 # Copyright (c) 2012-2015 Kapiche Ltd.
 # Author: Ryan Stuart<ryan@kapiche.com>
+from builtins import str as text
+
 import six
 
 
@@ -25,7 +27,7 @@ class Key(object):
         :param :class:`Key` parent: The parent of this key.
         :param int or st value: the name or id of this key.
         """
-        self._kind = kind
+        self._kind = u"%s" % text(kind)  # Make SURE we have unicode
         self._parent = parent
         self._id = self._name = None
         if isinstance(value, six.string_types):
