@@ -3,7 +3,7 @@
 from __future__ import absolute_import
 import sys
 
-from ..exceptions import ObjectDoesNotExist, MultipleObjectsReturned
+from ..exceptions import DoesNotExist, MultipleObjectsReturned
 from ..options import Options
 from ..queryset.manager import QuerySetManager
 from .properties import BaseProperty
@@ -124,7 +124,7 @@ class EntityMeta(type):
         setattr(
             new_cls,
             'DoesNotExist',
-            subclass_exception(str('DoesNotExist'), (ObjectDoesNotExist,), module, attached_to=new_cls)
+            subclass_exception(str('DoesNotExist'), (DoesNotExist,), module, attached_to=new_cls)
         )
         setattr(
             new_cls,

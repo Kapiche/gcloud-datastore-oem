@@ -311,7 +311,7 @@ class EnvironmentError(Exception):
     pass
 
 
-class ObjectDoesNotExist(Exception):
+class DoesNotExist(Exception):
     pass
 
 
