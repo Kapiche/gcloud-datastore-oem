@@ -518,11 +518,22 @@ class DateProperty(DateTimeProperty):
             self.error('Value must be a datetime.date')
         return value
 
-    def to_datastore_value(self, value):
-        return datetime.datetime(value.year, value.month, value.day)
+    def from_protobuf(self, pb_value):
+        microseconds = pb_value.timestamp_microseconds_value
+        naive = (datetime.datetime.utcfromtimestamp(0) + datetime.timedelta(microseconds=microseconds))
+        return naive.replace(tzinfo=pytz.utc).date()
 
-    def to_python_value(self, value):
-        return value.date()
+    def to_protobuf(self, value):
+        name = 'timestamp_microseconds_value'
+        # If the datetime is naive (no timezone), consider that it was
+        # intended to be UTC and replace the tzinfo to that effect.
+        if not value.tzinfo:
+            value = value.replace(tzinfo=pytz.utc)
+        # Regardless of what timezone is on the value, convert it to UTC.
+        value = value.astimezone(pytz.utc)
+        # Convert the datetime to a microsecond timestamp.
+        value = int(calendar.timegm(value.timetuple()) * 1e6) + value.microsecond
+        return name, value
 
     def _now(self):
         return datetime.datetime.utcnow().date()
@@ -535,15 +546,22 @@ class TimeProperty(DateTimeProperty):
             self.error("Value must be a datetime.time")
         return value
 
-    def to_datastore_value(self, value):
-        return datetime.datetime(
-            1970, 1, 1,
-            value.hour, value.minute, value.second,
-            value.microsecond
-        )
+    def from_protobuf(self, pb_value):
+        microseconds = pb_value.timestamp_microseconds_value
+        naive = (datetime.datetime.utcfromtimestamp(0) + datetime.timedelta(microseconds=microseconds))
+        return naive.replace(tzinfo=pytz.utc).time()
 
-    def to_python_value(self, value):
-        return value.time()
+    def to_protobuf(self, value):
+        name = 'timestamp_microseconds_value'
+        # If the datetime is naive (no timezone), consider that it was
+        # intended to be UTC and replace the tzinfo to that effect.
+        if not value.tzinfo:
+            value = value.replace(tzinfo=pytz.utc)
+        # Regardless of what timezone is on the value, convert it to UTC.
+        value = value.astimezone(pytz.utc)
+        # Convert the datetime to a microsecond timestamp.
+        value = int(calendar.timegm(value.timetuple()) * 1e6) + value.microsecond
+        return name, value
 
 
 class ListProperty(ContainerBaseProperty):

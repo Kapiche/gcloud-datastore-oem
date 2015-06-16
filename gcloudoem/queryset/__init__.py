@@ -213,7 +213,7 @@ class QuerySet(object):
         """
         Returns the first object of a query, returns None if no match is found.
         """
-        entities = list((self if self._query.order else self.order_by('__key__'))[:1])
+        entities = list(self)[:1]
         if entities:
             return entities[0]
         return None
@@ -222,7 +222,7 @@ class QuerySet(object):
         """
         Returns the last object of a query, returns None if no match is found.
         """
-        objects = list((self.reverse() if self._query.order else self.order_by('-__key__'))[:1])
+        objects = list(self.reverse())[:1]
         if objects:
             return objects[0]
         return None
@@ -241,7 +241,7 @@ class QuerySet(object):
 
     def delete(self):
         """Deletes the entities in the current QuerySet."""
-        assert not self._query.is_limited(), "Cannot use 'limit' or 'offset' with delete."
+        assert self._query.is_limited(), "Cannot use 'limit' or 'offset' with delete."
 
         if self._properties is not None:
             raise TypeError("Cannot call delete() after .values() or .values_list()")
