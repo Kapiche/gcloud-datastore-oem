@@ -174,7 +174,7 @@ class ReferenceProperty(BaseProperty):
         return instance._data.get(self.name)
 
     def __set__(self, instance, value):
-        if not isinstance(value, (Key, self.entity_cls)):
+        if not isinstance(value, (Key, self.entity_cls)) and value is not None:
             raise TypeError('The value of a ReferenceProperty must be an Entity or Key')
         instance._data[self.name] = value
 

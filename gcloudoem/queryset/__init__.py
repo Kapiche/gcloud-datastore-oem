@@ -241,12 +241,12 @@ class QuerySet(object):
 
     def delete(self):
         """Deletes the entities in the current QuerySet."""
-        assert self._query.is_limited(), "Cannot use 'limit' or 'offset' with delete."
+        assert not self._query.is_limited(), "Cannot use 'limit' or 'offset' with delete."
 
         if self._properties is not None:
             raise TypeError("Cannot call delete() after .values() or .values_list()")
 
-        del_query = self._clone()
+        del_query = list(self._clone())
 
         with Transaction(Transaction.SNAPSHOT) as txn:
             for e in iter(del_query):
