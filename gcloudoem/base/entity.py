@@ -9,6 +9,7 @@ NON_FIELD_ERRORS = '__all__'
 
 
 class BaseEntity(object):
+
     def __init__(self, **kwargs):
         """
         Initialise an entity. Values for an entity's properties can be passed as keyword or positional arguments.
@@ -20,11 +21,14 @@ class BaseEntity(object):
                     Entity. If its a tuple, it should be in the form (parent_entity, key_value). Otherwise, it should be
                     the value of this key (either an int or str).
         """
+        self._initialised = False
         self._data = {}  # Property values will be stored here by the property descriptors
 
         # Set attribute values
         for name in self._properties:
             setattr(self, name, kwargs.get(name, None))  # None causes default value to be set if present
+
+        self._initialised = True
 
     def clean(self):
         """

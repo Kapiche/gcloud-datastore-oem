@@ -36,7 +36,6 @@ class Query(object):
     A Google Datastore Query.
 
     This class serves as an abstraction for creating a query over data stored in Datastore.
-
     """
 
     OPERATORS = {
@@ -90,13 +89,16 @@ class Query(object):
 
         self._entity = entity
         self._ancestor = ancestor
-        self._filters = list(filters)
+        self._filters = list()
         self._projection = list(projection)
         self._order = list(order)
         self._group_by = list(group_by)
         self._limit = limit
         self._offset = offset
         self._has_inequality_filter = None
+
+        for f in filters:
+            self.add_filter(*f)
 
     @property
     def limit(self):

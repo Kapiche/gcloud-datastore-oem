@@ -22,8 +22,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 from . import datastore_v1_pb2 as datastore_pb, environment, utils
 from .connection import get_connection
-from ..properties import KeyProperty, ListProperty
-
+from ..properties import KeyProperty, ListProperty, ReferenceProperty
 
 _TRANSACTIONS = utils._LocalStack()
 
@@ -188,11 +187,15 @@ class Transaction(object):
             if isinstance(property, KeyProperty):  # Already dealt with the key
                 continue
 
-            value = getattr(entity, name)
-            if value is None:  # Nothing to save.
-                continue
+            value_is_reference = isinstance(property, ReferenceProperty)
+            if value_is_reference:
+                value = entity._data[property.name]  # We are happy with the Key, don't fetch the entity
+            else:
+                value = getattr(entity, name)
+                if value is None:  # Nothing to save.
+                    continue
 
-            value_is_list = isinstance(value, ListProperty)
+            value_is_list = isinstance(property, ListProperty)
             if value_is_list and len(value) == 0:  # Nothing to save
                 continue
 

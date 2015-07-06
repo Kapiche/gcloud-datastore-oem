@@ -92,7 +92,8 @@ class Entity(with_metaclass(EntityMeta, BaseEntity)):
             value = cls._properties[property_pb.name].from_protobuf(property_pb.value)
             entity_props[property_pb.name] = value
 
-        return cls(**entity_props)
+        instance = cls(**entity_props)
+        return instance
 
     def __repr__(self):
         key = self._data['key']

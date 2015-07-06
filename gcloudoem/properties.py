@@ -239,7 +239,7 @@ class BlobProperty(BaseProperty):
         self._compressed = compressed
 
     def from_protobuf(self, pb_value):
-        value = pb_value.blobl_value
+        value = pb_value.blob_value
         if self._compressed:
             return zlib.decompress(value)
         return value

@@ -4,6 +4,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 import copy
 import warnings
+import itertools
 import six
 import sys
 
@@ -25,12 +26,19 @@ class QuerySet(object):
     Internally, this just creates a :class:`~gcloudoem.datastore.query.Query`, and returns
     :class:`~gcloudoem.entity.Entity` instances from the underlying :class:`~gcloudoem.data.query.Cursor`.
     """
-    def __init__(self, entity, query=None):
+    def __init__(self, entity, queries=None):
         self.entity = entity
         self._result_cache = None
 
-        self._query = query or Query(entity)
+        self._queries = queries or []
         self._properties = None
+
+        self._start = 0
+        self._limit = None
+        self._step = 1
+        self._order = None
+        self._is_filtered = False
+        self._projection = None
 
     ##
     # Python data-model related functions
@@ -84,14 +92,15 @@ class QuerySet(object):
         # Slice provided
         if isinstance(k, slice):
             qs = self._clone()
-            start = 0 if k.start is None else k.start
-            stop = k.stop
-            qs._query.set_limits(start, stop)
-            return list(qs)[::k.step] if k.step else qs
+            qs._start, qs._limit, = k.start, k.stop
+            if k.start and k.stop:
+                qs._limit = k.stop - k.start
+            qs._step = k.step
+            return list(qs)[qs._start:qs._limit:qs._step]
         # Integer index provided
         elif isinstance(k, six.integer_types):
-            self._query.limit = k + 1  # Lists are 0 indexed
-            return list(self._query())[k]
+            qs = self._clone()
+            return list(qs)[k]
 
     def __iter__(self):
         """Fills the cache by evaluating the queryset then iterates the results."""
@@ -120,7 +129,12 @@ class QuerySet(object):
     # Public methods that evaluate the queryset
     ##
     def iterator(self):
-        return self._query()
+        for q in self._queries:
+            if self._order:
+                q.order_by(self._order)
+            if self._projection:
+                q.projections(self._projection)
+        return itertools.chain(*[q() for q in self._queries])
 
     def count(self):
         """
@@ -233,7 +247,7 @@ class QuerySet(object):
 
         For this method, ID means the name_or_id of an entity key.
         """
-        assert not self._query.is_limited(), "Can't 'limit' or 'offset' with in_bulk"
+        assert not self._is_limited(), "Can't 'limit' or 'offset' with in_bulk"
         if not id_list:
             return {}
         qs = self.filter(pk__in=id_list).order_by()
@@ -241,7 +255,7 @@ class QuerySet(object):
 
     def delete(self):
         """Deletes the entities in the current QuerySet."""
-        assert not self._query.is_limited(), "Cannot use 'limit' or 'offset' with delete."
+        assert not self._is_limited(), "Cannot use 'limit' or 'offset' with delete."
 
         if self._properties is not None:
             raise TypeError("Cannot call delete() after .values() or .values_list()")
@@ -257,9 +271,8 @@ class QuerySet(object):
 
     def update(self, **kwargs):
         """Updates all elements in the current QuerySet, setting all the given properties to the appropriate values."""
-        assert not self._query.is_limited(), "Cannot update a query once a slice has been taken."
-        query = self._query.clone()
-        entities = query.execute()
+        assert not self._is_limited(), "Cannot update a query once a slice has been taken."
+        entities = list(self)
         for e in entities:
             for name, value in kwargs.items():
                 setattr(e, name, value)
@@ -295,34 +308,38 @@ class QuerySet(object):
         """
         Returns a new QuerySet instance with the ordering changed.
         """
-        assert not self._query.is_limited(), "Cannot reorder a query once a slice has been taken."
+        assert not self._is_limited(), "Cannot reorder a query once a slice has been taken."
         obj = self._clone()
-        obj._query.order = field_names
+        obj._order = field_names
         return obj
 
     def projection(self, *properties):
         """Use a Datastore projection query. A projection query only returns certain properties as specified."""
-        assert not self._query.is_limited(), "Cannot reorder a query once a slice has been taken."
-        assert not self._query.projection, "projection() already used."
+        assert not self._is_limited(), "Cannot reorder a query once a slice has been taken."
+        assert not self._projection, "projection() already used."
         clone = self._clone()
-        clone._query.projection = properties
+        clone._projection = properties
         return clone
 
     def keys_only(self):
         """Retrieve only the key property for entities in the QuerySet."""
-        assert not self._query.is_limited(), "Cannot reorder a query once a slice has been taken."
-        assert not self._query.projection, "Can't use keys_only() after using projection()."
+        assert not self._is_limited(), "Cannot reorder a query once a slice has been taken."
+        assert not self._projection, "Can't use keys_only() after using projection()."
         clone = self._clone()
-        clone._query.keys_only()
+        clone._projection = '__key__'
         return clone
 
     ##
     # Private methods
     ##
     def _clone(self, **kwargs):
-        query = self._query.clone()
-        clone = self.__class__(entity=self.entity, query=query)
+        clone = self.__class__(entity=self.entity, queries=self._queries[:])
         clone._properties = self._properties
+        clone._start = self._start
+        clone._limit = self._limit
+        clone._step = self._step
+        clone._is_filtered = self._is_filtered
+        clone._projection = self._projection
 
         clone.__dict__.update(kwargs)
 
@@ -343,7 +360,15 @@ class QuerySet(object):
         Checks if this QuerySet has any filtering going on. Note that this isn't equivalent for checking if all objects
         are present in results, for example qs[1:]._has_filters() -> False.
         """
-        return bool(self._query.filters)
+        return self._is_filtered
+
+    def _is_limited(self):
+        """
+        Checks if the QuerySet has and limiting/slicing happening.
+
+        :return: bool
+        """
+        return self._start or self._limit
 
     def _create_object_from_params(self, lookup, params):
         """Tries to create an entity using passed params. Used by get_or_create and update_or_create."""
@@ -375,7 +400,7 @@ class QuerySet(object):
         order_by = field_name or getattr(self.entity._meta, 'get_latest_by')
         assert bool(order_by), \
             "earliest() and latest() require either a field_name parameter or 'get_latest_by' in the model"
-        assert not self._query.is_limited(), "Can't apply limit or slice to earliest() or latest()"
+        assert not self._is_limited(), "Can't apply limit or slice to earliest() or latest()"
         clone = self._clone()
         clone._stop = 1
         clone.order_by('%s%s' % (direction, order_by))
@@ -383,11 +408,23 @@ class QuerySet(object):
 
     def _filter_or_exclude(self, negate, *args, **kwargs):
         if args or kwargs:
-            assert not self._query.is_limited(), "Cannot filter a query once a slice has been taken."
+            assert not self._is_limited(), "Cannot filter a query once a slice has been taken."
         assert not negate, "Exclude not supported yet"
 
         clone = self._clone()
         filters = convert_lookups(**kwargs)
         for f in filters:
-            clone._query.add_filter(*f)
+            # Datastore doesn't support OR queries. To do OR queries, you need to do separate queries.
+            # So each AND filter gets applied to every query. Each OR filter (only the in operator) creates a new query.
+            if f[1] == 'in':
+                existing_filters = clone._queries[0].filters() if clone._queries else []
+                clone._queries = clone._queries + [
+                    Query(self.entity, filters=existing_filters + [(f[0], 'eq', value,)]) for value in f[2]
+                ]
+            else:
+                if clone._queries:
+                    for q in clone._queries:
+                        q.add_filter(*f)
+                else:
+                    clone._queries.append(Query(self.entity, filters=[f]))
         return clone

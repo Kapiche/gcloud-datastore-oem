@@ -3,7 +3,7 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 
-COMPARISON_OPERATORS = ('gt', 'gte', 'lt', 'lte',)
+COMPARISON_OPERATORS = ('gt', 'gte', 'lt', 'lte', 'in',)
 LOOKUP_SEP = '__'
 
 
