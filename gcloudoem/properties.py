@@ -246,7 +246,7 @@ class BlobProperty(BaseProperty):
 
     def to_protobuf(self, value):
         if self._compressed:
-            return zlib.compress(value)
+            value = zlib.compress(value)
         return 'blob_value', value
 
     def validate(self, value):
