@@ -29,6 +29,11 @@ class BaseEntity(object):
             setattr(self, name, kwargs.get(name, None))  # None causes default value to be set if present
 
         self._initialised = True
+        self._meta.pk = self.pk  # Django compatibility hack
+
+    @property
+    def pk(self):
+        return self.key.name_or_id
 
     def clean(self):
         """

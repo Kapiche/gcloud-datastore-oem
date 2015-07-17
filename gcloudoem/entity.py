@@ -46,10 +46,6 @@ class Entity(with_metaclass(EntityMeta, BaseEntity)):
     def __init__(self, **kwargs):
         super(Entity, self).__init__(**kwargs)
 
-    @property
-    def pk(self):
-        return self.key.name_or_id
-
     def save(self, force_insert=False, validate=True, clean=True, **kwargs):
         """
         Save the :class:`Entity` to the database. If the entity already exists, it will be updated,
