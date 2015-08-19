@@ -26,6 +26,8 @@ used internally but could be later on.
 from __future__ import absolute_import, division, print_function
 
 import os
+import random
+import time
 
 from .base import BaseConnection
 from . import datastore_v1_pb2 as datastore_pb
@@ -85,6 +87,12 @@ class Connection(BaseConnection):
     API_URL_TEMPLATE = ('{api_base}/datastore/{api_version}/datasets/{dataset_id}/{method}')
     """A template for the URL of a particular API call."""
 
+    RETRY_STATUSES = [500, 502, 503, 504]
+    """Automatically retry a request when we encounter any of these status codes."""
+
+    MAX_RETRIES = 2
+    """Number of times to try a request when a RETRY_STATUSES code is encountered."""
+
     def __init__(self, dataset_id, namespace, credentials=None, http=None, api_base_url=None):
         """
         :param str dataset_id: The gcloud Datastore dataset identified.
@@ -112,23 +120,28 @@ class Connection(BaseConnection):
         :returns: The str response content from the API call.
         :raises: :class:`~gcloudoem.exceptions.GCloudError` if the response code is not 200 OK.
         """
+        retries = 0
         headers = {
             'Content-Type': 'application/x-protobuf',
             'Content-Length': str(len(data)),
             'User-Agent': self.USER_AGENT,
         }
-        headers, content = self.http.request(
-            uri=self.build_api_url(method=method),
-            method='POST',
-            headers=headers,
-            body=data
-        )
+        while True:
+            headers, content = self.http.request(
+                uri=self.build_api_url(method=method),
+                method='POST',
+                headers=headers,
+                body=data
+            )
 
-        status = headers['status']
-        if status != '200':
-            raise make_exception(headers, content, use_json=False)
-
-        return content
+            status = headers['status']
+            if status != '200':
+                if status in self.RETRY_STATUSES and retries < self.MAX_RETRIES:
+                    retries += 1
+                    time.sleep(random.random() * retries)
+                    continue
+                raise make_exception(headers, content, use_json=False)
+            return content
 
     def _rpc(self, method, request_pb, response_pb_cls):
         """
