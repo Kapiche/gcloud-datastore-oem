@@ -131,7 +131,7 @@ class QuerySet(object):
     def iterator(self):
         for q in self._queries:
             if self._order:
-                q.order_by(self._order)
+                q.order = self._order
             if self._projection:
                 q.projections(self._projection)
         return itertools.chain(*[q() for q in self._queries])
