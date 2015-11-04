@@ -5,8 +5,9 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 import copy
 import warnings
 import itertools
-import six
 import sys
+
+import six
 
 from ..datastore.query import Query
 from ..datastore.transaction import Transaction
@@ -146,17 +147,29 @@ class QuerySet(object):
         return len(self._result_cache)
 
     def get(self, *args, **kwargs):
-        """Performs the query and returns a single entity matching the given keyword arguments."""
+        """
+        Performs the query and returns a single entity matching the given keyword arguments.
+
+        if strong_consistency is True, This is done inside a Datastore transaction.
+        """
+        strong_consistency = kwargs.pop('strong_consistency', False)
         clone = self.filter(*args, **kwargs)
         clone = clone.order_by()
-        num = len(clone)
-        if num == 1:
-            return clone._result_cache[0]
-        if not num:
-            raise self.entity.DoesNotExist("%s matching query does not exist." % self.entity._meta.kind)
-        raise self.entity.MultipleObjectsReturned(
-            "get() returned more than one %s -- it returned %s!" % (self.entity._meta.kind, num)
-        )
+        try:
+            if strong_consistency:
+                transaction = Transaction(Transaction.SNAPSHOT)
+                transaction.begin()
+            num = len(clone)
+            if num == 1:
+                return clone._result_cache[0]
+            if not num:
+                raise self.entity.DoesNotExist("%s matching query does not exist." % self.entity._meta.kind)
+            raise self.entity.MultipleObjectsReturned(
+                "get() returned more than one %s -- it returned %s!" % (self.entity._meta.kind, num)
+            )
+        finally:
+            if strong_consistency:
+                transaction.commit()
 
     def create(self, **kwargs):
         """Creates a new entity with the given kwargs, saving it to the database and returning the created entity."""
@@ -175,9 +188,10 @@ class QuerySet(object):
 
         :return: The created entities
         """
-        with Transaction(Transaction.SNAPSHOT) as txn:
-            for entity in entities:
-                txn.create(entity)
+        for chunk in self._chunk(entities, 500):
+            with Transaction(Transaction.SNAPSHOT) as txn:
+                for entity in chunk:
+                    txn.create(entity)
 
         return entities
 
@@ -260,11 +274,10 @@ class QuerySet(object):
         if self._properties is not None:
             raise TypeError("Cannot call delete() after .values() or .values_list()")
 
-        del_query = list(self._clone())
-
-        with Transaction(Transaction.SNAPSHOT) as txn:
-            for e in iter(del_query):
-                txn.delete(e)
+        for chunk in self._chunk(list(self._clone()), 500):  # Can only operate on 500 items at once
+            with Transaction(Transaction.SNAPSHOT) as txn:
+                for e in iter(chunk):
+                    txn.delete(e)
 
         # Clear the result cache, in case this QuerySet gets reused.
         self._result_cache = None
@@ -276,9 +289,10 @@ class QuerySet(object):
         for e in entities:
             for name, value in kwargs.items():
                 setattr(e, name, value)
-        with Transaction(Transaction.SNAPSHOT) as txn:
-            for e in entities:
-                txn.put(e)
+        for chunk in self._chunk(entities, 500):
+            with Transaction(Transaction.SNAPSHOT) as txn:
+                for e in entities:
+                    txn.put(e)
         self._result_cache = None
         return entities
 
@@ -428,3 +442,9 @@ class QuerySet(object):
                 else:
                     clone._queries.append(Query(self.entity, filters=[f]))
         return clone
+
+    @staticmethod
+    def _chunk(items, size):
+        """Yield successive n-sized chunks from l."""
+        for i in range(0, len(items), size):
+            yield items[i:i+size]
