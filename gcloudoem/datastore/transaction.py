@@ -296,7 +296,7 @@ class Transaction(object):
         want to use a context manager.
         """
         try:
-            response = self._connection.commit(self._mutation)
+            response = self._connection.commit(self._mutation, self._id)
             # If the back-end returns without error, we are guaranteed that the response's 'insert_auto_id_key' will
             # match (length and order) the request's 'insert_auto_id` entities, which are derived from our
             # '_auto_id_entities' (no partial success).
