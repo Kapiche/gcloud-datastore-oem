@@ -157,7 +157,7 @@ class QuerySet(object):
         clone = clone.order_by()
         try:
             if strong_consistency:
-                transaction = Transaction(Transaction.SNAPSHOT)
+                transaction = Transaction(Transaction.SERIALIZABLE)
                 transaction.begin()
             num = len(clone)
             if num == 1:
