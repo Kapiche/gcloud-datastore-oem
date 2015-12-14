@@ -20,6 +20,8 @@
 """Base classes."""
 from __future__ import absolute_import
 
+import threading
+
 import httplib2
 
 
@@ -46,7 +48,7 @@ class BaseConnection(object):
     * ``body``
     * ``headers``
 
-    In addition, ``redirections`` and ``connection_type`` may be used.
+    In addition, ``redirections`` and ``connection_type`` may be used and it must be thread safe.
 
     Without the use of ``credentials.authorize(http)``, a custom ``http`` object will also need to be able to add a
     bearer token to API requests and handle token refresh on 401 errors.
@@ -71,6 +73,7 @@ class BaseConnection(object):
         :type http: :class:`httplib2.Http` or class that defines ``request()``.
         :param http: An optional HTTP object to make requests.
         """
+        self._local = threading.local()
         self._dataset = dataset
         self._namespace = namespace
         self._http = http
@@ -102,8 +105,11 @@ class BaseConnection(object):
         :rtype: :class:`httplib2.Http`
         :returns: A Http object used to transport data.
         """
-        if self._http is None:
-            self._http = httplib2.Http()
+        if self._http is not None:
+            return self._http
+
+        if not hasattr(self._local, "http"):
+            self._local.http = httplib2.Http()
             if self._credentials:
-                self._http = self._credentials.authorize(self._http)
-        return self._http
+                self._local.http = self._credentials.authorize(self._local.http)
+        return self._local.http
