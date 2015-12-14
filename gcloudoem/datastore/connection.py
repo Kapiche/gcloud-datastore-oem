@@ -27,6 +27,7 @@ from __future__ import absolute_import, division, print_function
 
 import os
 import random
+import ssl
 import time
 
 from .base import BaseConnection
@@ -127,12 +128,16 @@ class Connection(BaseConnection):
             'User-Agent': self.USER_AGENT,
         }
         while True:
+            #try:
             headers, content = self.http.request(
                 uri=self.build_api_url(method=method),
                 method='POST',
                 headers=headers,
                 body=data
             )
+            #except ssl.SSLError as e:
+                #import pdb
+                #pdb.set_trace()
 
             status = headers['status']
             if status != '200':
