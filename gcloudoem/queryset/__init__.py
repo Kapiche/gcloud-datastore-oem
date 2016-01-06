@@ -188,7 +188,7 @@ class QuerySet(object):
 
         :return: The created entities
         """
-        for chunk in self._chunk(entities, 500):
+        for chunk in self._chunk(entities, 25):  # Limit for ancestor-less transactions
             with Transaction(Transaction.SNAPSHOT) as txn:
                 for entity in chunk:
                     txn.create(entity)
@@ -274,7 +274,7 @@ class QuerySet(object):
         if self._properties is not None:
             raise TypeError("Cannot call delete() after .values() or .values_list()")
 
-        for chunk in self._chunk(list(self._clone()), 500):  # Can only operate on 500 items at once
+        for chunk in self._chunk(list(self._clone()), 500):  # Can only operate on 55 items at once when ancestor-less
             with Transaction(Transaction.SNAPSHOT) as txn:
                 for e in iter(chunk):
                     txn.delete(e)
@@ -289,7 +289,7 @@ class QuerySet(object):
         for e in entities:
             for name, value in kwargs.items():
                 setattr(e, name, value)
-        for chunk in self._chunk(entities, 500):
+        for chunk in self._chunk(entities, 25):  # Limit for ancestor-less transactions
             with Transaction(Transaction.SNAPSHOT) as txn:
                 for e in entities:
                     txn.put(e)
