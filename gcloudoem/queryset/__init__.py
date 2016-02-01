@@ -274,7 +274,7 @@ class QuerySet(object):
         if self._properties is not None:
             raise TypeError("Cannot call delete() after .values() or .values_list()")
 
-        for chunk in self._chunk(list(self._clone()), 500):  # Can only operate on 55 items at once when ancestor-less
+        for chunk in self._chunk(list(self._clone()), 25):  # Can only operate on 25 items at once when ancestor-less
             with Transaction(Transaction.SNAPSHOT) as txn:
                 for e in iter(chunk):
                     txn.delete(e)
