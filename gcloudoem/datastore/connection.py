@@ -82,7 +82,7 @@ class Connection(BaseConnection):
     possible to use the same same credentials across projects in gcloud, it's rarely done and keeping all these things
     together aligns much better with a traditional database.
     """
-    API_VERSION = 'v1beta2'
+    API_VERSION = 'v1'
     """The version of the API, used in building the API call's URL."""
 
     API_URL_TEMPLATE = ('{api_base}/datastore/{api_version}/datasets/{dataset_id}/{method}')
