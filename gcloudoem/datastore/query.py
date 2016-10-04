@@ -24,7 +24,8 @@ import base64
 
 import six
 
-from . import datastore_v1_pb2 as datastore_pb, utils
+from . import utils
+from ._generated import query_pb2 as query_pb
 from .connection import get_connection
 from ..exceptions import InvalidQueryError
 from ..key import Key
@@ -39,16 +40,16 @@ class Query(object):
     """
 
     OPERATORS = {
-        '<=': datastore_pb.PropertyFilter.LESS_THAN_OR_EQUAL,
-        'lte': datastore_pb.PropertyFilter.LESS_THAN_OR_EQUAL,
-        '>=': datastore_pb.PropertyFilter.GREATER_THAN_OR_EQUAL,
-        'gte': datastore_pb.PropertyFilter.GREATER_THAN_OR_EQUAL,
-        '<': datastore_pb.PropertyFilter.LESS_THAN,
-        'lt': datastore_pb.PropertyFilter.LESS_THAN,
-        '>': datastore_pb.PropertyFilter.GREATER_THAN,
-        'gt': datastore_pb.PropertyFilter.GREATER_THAN,
-        '=': datastore_pb.PropertyFilter.EQUAL,
-        'eq': datastore_pb.PropertyFilter.EQUAL,
+        '<=': query_pb.PropertyFilter.LESS_THAN_OR_EQUAL,
+        'lte': query_pb.PropertyFilter.LESS_THAN_OR_EQUAL,
+        '>=': query_pb.PropertyFilter.GREATER_THAN_OR_EQUAL,
+        'gte': query_pb.PropertyFilter.GREATER_THAN_OR_EQUAL,
+        '<': query_pb.PropertyFilter.LESS_THAN,
+        'lt': query_pb.PropertyFilter.LESS_THAN,
+        '>': query_pb.PropertyFilter.GREATER_THAN,
+        'gt': query_pb.PropertyFilter.GREATER_THAN,
+        '=': query_pb.PropertyFilter.EQUAL,
+        'eq': query_pb.PropertyFilter.EQUAL,
     }
     """Mapping of operator strs and their protobuf equivalents."""
 
@@ -197,14 +198,14 @@ class Query(object):
                 raise InvalidQueryError('Invalid key value "%s"' % type(value))
             if not isinstance(value, Key):
                 value = Key(self._entity._meta.kind, value=value)
-            if self.OPERATORS[operator] != datastore_pb.PropertyFilter.EQUAL:
+            if self.OPERATORS[operator] != query_pb.PropertyFilter.EQUAL:
                 raise InvalidQueryError('Invalid operator for key: "%s"' % operator)
         elif not hasattr(self._entity, property_name):
             raise InvalidQueryError("Entity %s used in this Query doesn't have a property %s" %
                                     (self._entity._meta.kind, property_name))
 
         if self.OPERATORS[operator] in (
-            datastore_pb.PropertyFilter.LESS_THAN_OR_EQUAL, datastore_pb.PropertyFilter.GREATER_THAN_OR_EQUAL,
+            query_pb.PropertyFilter.LESS_THAN_OR_EQUAL, query_pb.PropertyFilter.GREATER_THAN_OR_EQUAL,
         ):
             if not self._has_inequality_filter:
                 self._has_inequality_filter = property_name
@@ -342,7 +343,7 @@ class Query(object):
         :returns: A protobuf query that can be sent to the protobuf API.  N.b. that it does not contain "in-flight"
             fields for ongoing query executions (cursors, offset, limit).
         """
-        pb = datastore_pb.Query()
+        pb = query_pb.Query()
 
         for projection_name in self._projection:
             pb.projection.add().property.name = projection_name
@@ -351,15 +352,15 @@ class Query(object):
             pb.kind.add().name = self._entity._meta.kind
 
         composite_filter = pb.filter.composite_filter
-        composite_filter.operator = datastore_pb.CompositeFilter.AND
+        composite_filter.op = query_pb.CompositeFilter.AND
 
         if self.ancestor:
-            ancestor_pb = utils.prepare_key_for_request(self.ancestor._properties['key'].to_protobuf(self.ancestor.key))
+            ancestor_pb = self.ancestor._properties['key'].to_protobuf(self.ancestor.key)
 
             # Filter on __key__ HAS_ANCESTOR == ancestor.
-            ancestor_filter = composite_filter.filter.add().property_filter
+            ancestor_filter = composite_filter.filters.add().property_filter
             ancestor_filter.property.name = '__key__'
-            ancestor_filter.operator = datastore_pb.PropertyFilter.HAS_ANCESTOR
+            ancestor_filter.op = query_pb.PropertyFilter.HAS_ANCESTOR
             ancestor_filter.value.key_value.CopyFrom(ancestor_pb)
 
         for property_name, operator, value in self.filters:
@@ -367,19 +368,19 @@ class Query(object):
 
             # Add the specific filter
             prop = self._entity._properties[property_name]
-            property_filter = composite_filter.filter.add().property_filter
+            property_filter = composite_filter.filters.add().property_filter
             property_filter.property.name = prop.db_name
-            property_filter.operator = pb_op_enum
+            property_filter.op = pb_op_enum
 
             # Set the value to filter on based on the type.
             if property_name == 'key':
                 key_pb = prop.to_protobuf(value)
-                property_filter.value.key_value.CopyFrom(utils.prepare_key_for_request(key_pb))
+                property_filter.value.key_value.CopyFrom(key_pb)
             else:
                 attr, pb_value = prop.to_protobuf(value)
                 utils.set_protobuf_value(property_filter.value, attr, pb_value)
 
-        if not composite_filter.filter:
+        if not composite_filter.filters:
             pb.ClearField('filter')
 
         for prop in self.order:
@@ -405,11 +406,11 @@ class Cursor(object):
     This class is a generator that can be iterated.
     """
 
-    _NOT_FINISHED = datastore_pb.QueryResultBatch.NOT_FINISHED
+    _NOT_FINISHED = query_pb.QueryResultBatch.NOT_FINISHED
 
     _FINISHED = (
-        datastore_pb.QueryResultBatch.NO_MORE_RESULTS,
-        datastore_pb.QueryResultBatch.MORE_RESULTS_AFTER_LIMIT,
+        query_pb.QueryResultBatch.NO_MORE_RESULTS,
+        query_pb.QueryResultBatch.MORE_RESULTS_AFTER_LIMIT,
     )
 
     def __init__(self, query, connection, limit=None, offset=0, start_cursor=None, end_cursor=None):

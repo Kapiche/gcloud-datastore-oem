@@ -26,7 +26,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 from threading import local
 
-from .import datastore_v1_pb2 as datastore_pb
+from ._generated import datastore_pb2 as datastore_pb
 
 
 __all__ = ('set_protobuf_value', 'prepare_key_for_request')
@@ -83,7 +83,7 @@ def set_protobuf_value(protobuf_obj, attr, pb_value):
     :param protobuf_obj: The protobuf instance to which the value is being assigned.
 
     :type attr: str
-    :param attr: The protobuf attribute name for this value. For example. 'string_value', 'list_value', etc.
+    :param attr: The protobuf attribute name for this value. For example. 'string_value', 'array_value', etc.
 
     :type pb_value: `datetime.datetime`, boolean, float, integer, string
     :param pb_value: The value to be assigned in the appropriate protobuf form. Usually obtained by calling
@@ -95,36 +95,12 @@ def set_protobuf_value(protobuf_obj, attr, pb_value):
 
     if attr == 'key_value':
         protobuf_obj.key_value.CopyFrom(pb_value)
-    elif attr == 'list_value':
-        l_pb = protobuf_obj.list_value
+    elif attr == 'timestamp_value':
+        protobuf_obj.timestamp_value.CopyFrom(pb_value)
+    elif attr == 'array_value':
+        l_pb = protobuf_obj.array_value.values
         for item in pb_value:
             i_pb = l_pb.add()
             set_protobuf_value(i_pb, item[0], item[1])
     else:  # scalar, just assign
         setattr(protobuf_obj, attr, pb_value)
-
-
-def prepare_key_for_request(key_pb):
-    """Add protobuf keys to a request object.
-
-    :type key_pb: :class:`gcloudoem.datastore.datastore_v1_pb2.Key`
-    :param key_pb: A key to be added to a request.
-
-    :rtype: :class:`gcloudeom.datastore.datastore_v1_pb2.Key`
-    :returns: A key which will be added to a request. It will be the original if nothing needs to be changed.
-    """
-    if key_pb.partition_id.HasField('dataset_id'):
-        # We remove the dataset_id from the protobuf. This is because
-        # the backend fails a request if the key contains un-prefixed
-        # dataset ID. The backend fails because requests to
-        #     /datastore/.../datasets/foo/...
-        # and
-        #     /datastore/.../datasets/s~foo/...
-        # both go to the datastore given by 's~foo'. So if the key
-        # protobuf in the request body has dataset_id='foo', the
-        # backend will reject since 'foo' != 's~foo'.
-        new_key_pb = datastore_pb.Key()
-        new_key_pb.CopyFrom(key_pb)
-        new_key_pb.partition_id.ClearField('dataset_id')
-        key_pb = new_key_pb
-    return key_pb

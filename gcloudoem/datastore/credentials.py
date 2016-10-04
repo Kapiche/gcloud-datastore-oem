@@ -24,13 +24,7 @@ import base64
 import calendar
 import datetime
 
-from Crypto.Hash import SHA256
-from Crypto.PublicKey import RSA
-from Crypto.Signature import PKCS1_v1_5
 from oauth2client import client
-from oauth2client.client import _get_application_default_credential_from_file
-from oauth2client import crypt
-from oauth2client import service_account
 import pytz
 import six
 from six.moves.urllib.parse import urlencode
@@ -75,103 +69,31 @@ def get_credentials():
     return client.GoogleCredentials.get_application_default()
 
 
-def get_for_service_account_json(json_credentials_path, scope=None):
-    """
-    Gets the credentials for a service account with JSON key.
-
-    :param str json_credentials_path: The path to a private key file (this file was given to you when you created the
-        service account). This file must contain a JSON object with a private key and other credentials information
-        (downloaded from the Google APIs console).
-
-    :type scope: string or tuple of string
-    :param scope: The scope against which to authenticate. (Different services require different scopes, check the
-        documentation for which scope is required for the different levels of access to any particular API.)
-
-    :rtype: :class:`oauth2client.client.GoogleCredentials`,
-        :class:`oauth2client.service_account._ServiceAccountCredentials`
-    :returns: New service account or Google (for a user JSON key file) credentials object.
-    """
-    credentials = _get_application_default_credential_from_file(json_credentials_path)
-    if scope is not None:
-        credentials = credentials.create_scoped(scope)
-    return credentials
-
-
-def get_for_service_account_p12(client_email, private_key_path, scope=None):
-    """Gets the credentials for a service account with PKCS12 / p12 key.
-
-    .. note::
-      This method is not used by default, instead :func:`get_credentials` is used. This method is intended to be used
-      when the environments is known explicitly and detecting the environment implicitly would be superfluous.
-
-    :param str client_email: The e-mail attached to the service account.
-
-    :param str private_key_path: The path to a private key file (this file was given to you when you created the service
-        account). This file must be in P12 format.
-
-    :type scope: string or tuple of string
-    :param scope: The scope against which to authenticate. (Different services require different scopes, check the
-        documentation for which scope is required for the different levels of access to any particular API.)
-
-    :rtype: :class:`oauth2client.client.SignedJwtAssertionCredentials`
-    :returns: A new ``SignedJwtAssertionCredentials`` instance with the needed service account settings.
-    """
-    return client.SignedJwtAssertionCredentials(
-        service_account_name=client_email,
-        private_key=open(private_key_path, 'rb').read(),
-        scope=scope
-    )
-
-
-def _get_pem_key(credentials):
-    """Gets RSA key for a PEM payload from a credentials object.
-
-    :type credentials: :class:`client.SignedJwtAssertionCredentials`,
-                       :class:`service_account._ServiceAccountCredentials`
-    :param credentials: The credentials used to create an RSA key for signing text.
-
-    :rtype: :class:`Crypto.PublicKey.RSA._RSAobj`
-    :returns: An RSA object used to sign text.
-    :raises: `TypeError` if `credentials` is the wrong type.
-    """
-    if isinstance(credentials, client.SignedJwtAssertionCredentials):
-        # Take our PKCS12 (.p12) key and make it into a RSA key we can use.
-        pem_text = crypt.pkcs12_key_as_pem(credentials.private_key, credentials.private_key_password)
-    elif isinstance(credentials, service_account._ServiceAccountCredentials):
-        pem_text = credentials._private_key_pkcs8_text
-    else:
-        raise TypeError((credentials, 'not a valid service account credentials type'))
-
-    return RSA.importKey(pem_text)
-
-
-def _get_signed_query_params(credentials, expiration, signature_string):
+def _get_signed_query_params(credentials, expiration, string_to_sign):
     """Gets query parameters for creating a signed URL.
-
-    :type credentials: :class:`client.SignedJwtAssertionCredentials`,
-                       :class:`service_account._ServiceAccountCredentials`
-    :param credentials: The credentials used to create an RSA key for signing text.
-
+    :type credentials: :class:`oauth2client.client.AssertionCredentials`
+    :param credentials: The credentials used to create a private key
+                        for signing text.
     :type expiration: int or long
     :param expiration: When the signed URL should expire.
-
-    :param str signature_string: The string to be signed by the credentials.
-
+    :type string_to_sign: string
+    :param string_to_sign: The string to be signed by the credentials.
+    :raises AttributeError: If :meth: sign_blob is unavailable.
     :rtype: dict
-    :returns: Query parameters matching the signing credentials with a signed payload.
+    :returns: Query parameters matching the signing credentials with a
+              signed payload.
     """
-    pem_key = _get_pem_key(credentials)
-    # Sign the string with the RSA key.
-    signer = PKCS1_v1_5.new(pem_key)
-    signature_hash = SHA256.new(signature_string)
-    signature_bytes = signer.sign(signature_hash)
-    signature = base64.b64encode(signature_bytes)
+    if not hasattr(credentials, 'sign_blob'):
+        auth_uri = ('http://google-cloud-python.readthedocs.io/en/latest/'
+                    'google-cloud-auth.html#setting-up-a-service-account')
+        raise AttributeError('you need a private key to sign credentials.'
+                             'the credentials you are currently using %s '
+                             'just contains a token. see %s for more '
+                             'details.' % (type(credentials), auth_uri))
 
-    if isinstance(credentials, client.SignedJwtAssertionCredentials):
-        service_account_name = credentials.service_account_name
-    elif isinstance(credentials, service_account._ServiceAccountCredentials):
-        service_account_name = credentials._service_account_email
-    # We know one of the above must occur since `_get_pem_key` fails if not.
+    _, signature_bytes = credentials.sign_blob(string_to_sign)
+    signature = base64.b64encode(signature_bytes)
+    service_account_name = credentials.service_account_email
     return {
         'GoogleAccessId': service_account_name,
         'Expires': str(expiration),

@@ -1,6 +1,6 @@
 # Copyright (c) 2012-2015 Kapiche Ltd.
 # Author: Ryan Stuart<ryan@kapiche.com>
-from __future__ import absolute_import
+from __future__ import absolute_import, division
 
 import calendar
 import datetime
@@ -11,6 +11,7 @@ import pytz
 import six
 import zlib
 
+from google.protobuf import timestamp_pb2
 from google.protobuf.internal.type_checkers import Int64ValueChecker
 
 from .base.properties import BaseProperty, ContainerBaseProperty
@@ -101,17 +102,17 @@ class KeyProperty(BaseProperty):
             instance._data[self.name] = Key(kind, parent=parent, value=value)
 
     def to_protobuf(self, value):
-        from .datastore import datastore_v1_pb2 as datastore_pb
-        key = datastore_pb.Key()
+        from .datastore._generated import entity_pb2 as entity_pb
+        key = entity_pb.Key()
 
         dataset_id = get_connection().dataset
         if not dataset_id:
             raise EnvironmentError("Couldn't determine the dataset ID. Have you called connect?")
-        key.partition_id.dataset_id = dataset_id
-        key.partition_id.namespace = get_connection().namespace
+        key.partition_id.project_id = dataset_id
+        key.partition_id.namespace_id = get_connection().namespace
 
         for item in value.path:
-            element = key.path_element.add()
+            element = key.path.add()
             element.kind = item.kind
             if item.id:
                 element.id = item.id
@@ -133,7 +134,7 @@ class KeyProperty(BaseProperty):
         :returns: a new `Key` instance
         """
         last_key = None
-        for element in pb_value.path_element:
+        for element in pb_value.path:
             if element.HasField('id'):
                 key = Key(element.kind, parent=last_key, value=element.id)
             elif element.HasField('name'):
@@ -486,12 +487,15 @@ class DateTimeProperty(BaseProperty):
         self._auto_now = auto_now
 
     def from_protobuf(self, pb_value):
-        microseconds = pb_value.timestamp_microseconds_value
-        naive = (datetime.datetime.utcfromtimestamp(0) + datetime.timedelta(microseconds=microseconds))
+        naive = (
+            datetime.datetime.utcfromtimestamp(0) + datetime.timedelta(
+                seconds=pb_value.timestamp_value.seconds,
+                microseconds=(pb_value.timestamp_value.nanos / 1000.0),
+            )
+        )
         return naive.replace(tzinfo=pytz.utc)
 
     def to_protobuf(self, value):
-        name = 'timestamp_microseconds_value'
         # If the datetime is naive (no timezone), consider that it was
         # intended to be UTC and replace the tzinfo to that effect.
         if not value.tzinfo:
@@ -499,8 +503,10 @@ class DateTimeProperty(BaseProperty):
         # Regardless of what timezone is on the value, convert it to UTC.
         value = value.astimezone(pytz.utc)
         # Convert the datetime to a microsecond timestamp.
-        value = int(calendar.timegm(value.timetuple()) * 1e6) + value.microsecond
-        return name, value
+        ms_value = int(calendar.timegm(value.timetuple()) * 1e6) + value.microsecond
+        seconds, micros = divmod(ms_value, 10 ** 6)
+        nanos = micros * 10 ** 3
+        return 'timestamp_value', timestamp_pb2.Timestamp(seconds=seconds, nanos=nanos)
 
     def validate(self, value):
         if not isinstance(value, datetime.datetime):
@@ -519,21 +525,13 @@ class DateProperty(DateTimeProperty):
         return value
 
     def from_protobuf(self, pb_value):
-        microseconds = pb_value.timestamp_microseconds_value
-        naive = (datetime.datetime.utcfromtimestamp(0) + datetime.timedelta(microseconds=microseconds))
+        naive = (
+            datetime.datetime.utcfromtimestamp(0) + datetime.timedelta(
+                seconds=pb_value.timestamp_value.seconds,
+                microseconds=(pb_value.timestamp_value.nanos / 1000.0)
+            )
+        )
         return naive.replace(tzinfo=pytz.utc).date()
-
-    def to_protobuf(self, value):
-        name = 'timestamp_microseconds_value'
-        # If the datetime is naive (no timezone), consider that it was
-        # intended to be UTC and replace the tzinfo to that effect.
-        if not value.tzinfo:
-            value = value.replace(tzinfo=pytz.utc)
-        # Regardless of what timezone is on the value, convert it to UTC.
-        value = value.astimezone(pytz.utc)
-        # Convert the datetime to a microsecond timestamp.
-        value = int(calendar.timegm(value.timetuple()) * 1e6) + value.microsecond
-        return name, value
 
     def _now(self):
         return datetime.datetime.utcnow().date()
@@ -587,10 +585,10 @@ class ListProperty(ContainerBaseProperty):
         super(ListProperty, self).__init__(**kwargs)
 
     def from_protobuf(self, pb_value):
-        return [self.property.from_protobuf(v) for v in pb_value.list_value]
+        return [self.property.from_protobuf(v) for v in pb_value.array_value.values]
 
     def to_protobuf(self, value):
-        return 'list_value', [self.property.to_protobuf(v) for v in value]
+        return 'array_value', [self.property.to_protobuf(v) for v in value]
 
     def validate(self, value):
         if not isinstance(value, (list, tuple)):

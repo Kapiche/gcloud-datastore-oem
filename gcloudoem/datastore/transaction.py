@@ -20,7 +20,8 @@
 """Create / interact with a datastore transaction."""
 from __future__ import absolute_import, division, print_function, unicode_literals
 
-from . import datastore_v1_pb2 as datastore_pb, environment, utils
+from . import utils
+from ._generated import datastore_pb2 as datastore_pb
 from .connection import get_connection
 from ..properties import KeyProperty, ListProperty, ReferenceProperty
 
@@ -112,7 +113,7 @@ class Transaction(object):
         :raises: :class:`~gcloudoem.exceptions.ConnectionError` if there is no active connection.
         """
         self._connection = get_connection()
-        self._mutation = datastore_pb.Mutation()
+        self._mutation = datastore_pb.CommitRequest()
         self._auto_id_entities = []
         self._id = None
         self._status = self._INITIAL
@@ -169,16 +170,13 @@ class Transaction(object):
         # Prepare the key
         key = getattr(entity, 'key')
         key_pb = entity._properties['key'].to_protobuf(key)
-        key_pb = utils.prepare_key_for_request(key_pb)
 
         # What type of mutation is this?
-        if key.is_partial:  # autogen key?
-            insert = self._mutation.insert_auto_id.add()
+        if key.is_partial or force_insert:
+            insert = self._mutation.mutations.add().insert
             self._auto_id_entities.append(entity)
-        elif force_insert:
-            insert = self._mutation.insert.add()
         else:
-            insert = self._mutation.upsert.add()  # The default. Update or insert.
+            insert = self._mutation.mutations.add().upsert
 
         # Add the key
         insert.key.CopyFrom(key_pb)
@@ -200,17 +198,17 @@ class Transaction(object):
                 continue
 
             # Create the property
-            prop = insert.property.add()
-            prop.name = property.db_name
+            prop = insert.properties.get_or_create(property.db_name)
+            # prop.name = property.db_name
             attr, value = property.to_protobuf(value)
-            utils.set_protobuf_value(prop.value, attr, value)
+            utils.set_protobuf_value(prop, attr, value)
 
             if property.exclude_from_index:
                 if not value_is_list:
-                    prop.value.indexed = False
+                    prop.exclude_from_indexes = True
 
-                for sub_value in prop.value.list_value:
-                    sub_value.indexed = False
+                for sub_value in prop.array_value.values:
+                    sub_value.exclude_from_indexes = True
 
     def put(self, entity):
         """
@@ -269,8 +267,8 @@ class Transaction(object):
         if entity.key.is_partial:
             raise ValueError("Entity myst have a complete key")
 
-        key_pb = utils.prepare_key_for_request(entity._properties['key'].to_protobuf(entity.key))
-        self._mutation.delete.add().CopyFrom(key_pb)
+        key_pb = entity._properties['key'].to_protobuf(entity.key)
+        self._mutation.mutations.add().delete.CopyFrom(key_pb)
 
     def begin(self):
         """
@@ -297,11 +295,14 @@ class Transaction(object):
         """
         try:
             response = self._connection.commit(self._mutation, self._id)
+            mut_results = response.mutation_results
+            # index_updates = response.index_updates
+            completed_keys = [mut_result.key for mut_result in mut_results if mut_result.HasField('key')]
             # If the back-end returns without error, we are guaranteed that the response's 'insert_auto_id_key' will
             # match (length and order) the request's 'insert_auto_id` entities, which are derived from our
             # '_auto_id_entities' (no partial success).
-            for new_key_pb, entity in zip(response.insert_auto_id_key, self._auto_id_entities):
-                entity._data['key']._id = new_key_pb.path_element[-1].id
+            for new_key_pb, entity in zip(completed_keys, self._auto_id_entities):
+                entity._data['key']._id = new_key_pb.path[-1].id
         finally:
             self._status = self._FINISHED
             # Clear our own ID in case this gets accidentally reused.

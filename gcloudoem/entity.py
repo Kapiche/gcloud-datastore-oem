@@ -6,6 +6,7 @@ entities.
 """
 from __future__ import absolute_import, division, print_function, unicode_literals
 
+import six
 from future.utils import with_metaclass
 
 from .base.entity import BaseEntity
@@ -81,12 +82,12 @@ class Entity(with_metaclass(EntityMeta, BaseEntity)):
             'key': key
         }
 
-        for property_pb in pb.property:
-            if not hasattr(cls, property_pb.name):
+        for name, property_pb in six.iteritems(pb.properties):
+            if not hasattr(cls, name):
                 raise ValueError("Entity %s doesn't have a property by the name %s" %
-                                 (cls._meta.kind, property_pb.name))
-            value = cls._properties[property_pb.name].from_protobuf(property_pb.value)
-            entity_props[property_pb.name] = value
+                                 (cls._meta.kind, name))
+            value = cls._properties[name].from_protobuf(property_pb)
+            entity_props[name] = value
 
         instance = cls(**entity_props)
         return instance

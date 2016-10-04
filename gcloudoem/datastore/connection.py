@@ -27,17 +27,19 @@ from __future__ import absolute_import, division, print_function
 
 import os
 import random
-import ssl
 import time
 
 from .base import BaseConnection
-from . import datastore_v1_pb2 as datastore_pb
+from ._generated import datastore_pb2 as datastore_pb
 from ..exceptions import ConnectionError, make_exception
 
 
 DEFAULT_NAMESPACE = 'default'
 
-_GCD_HOST_ENV_VAR_NAME = 'DATASTORE_HOST'
+DATASTORE_API_HOST = 'datastore.googleapis.com'
+"""Datastore API request host."""
+GCD_HOST = 'DATASTORE_EMULATOR_HOST'
+"""Environment variable defining host for GCD dataset server."""
 
 _connections = {}
 _default_connection = None
@@ -82,10 +84,14 @@ class Connection(BaseConnection):
     possible to use the same same credentials across projects in gcloud, it's rarely done and keeping all these things
     together aligns much better with a traditional database.
     """
+    API_BASE_URL = 'https://' + DATASTORE_API_HOST
+    """The base of the API call URL."""
+
     API_VERSION = 'v1'
     """The version of the API, used in building the API call's URL."""
 
-    API_URL_TEMPLATE = ('{api_base}/datastore/{api_version}/datasets/{dataset_id}/{method}')
+    # API_URL_TEMPLATE = ('{api_base}/datastore/{api_version}/datasets/{dataset_id}/{method}')
+    API_URL_TEMPLATE = ('{api_base}/{api_version}/projects/{dataset_id}:{method}')
     """A template for the URL of a particular API call."""
 
     RETRY_STATUSES = [500, 502, 503, 504]
@@ -106,9 +112,12 @@ class Connection(BaseConnection):
             :attr:`~gcloudoem.datastore.base.BaseConnection.API_BASE_URL`.
         """
         super(Connection, self).__init__(dataset_id, namespace, credentials=credentials, http=http)
-        if api_base_url is None:
-            api_base_url = os.getenv(_GCD_HOST_ENV_VAR_NAME, BaseConnection.API_BASE_URL)
-        self.api_base_url = api_base_url
+        try:
+            self.host = os.environ[GCD_HOST]
+            self.api_base_url = 'http://' + self.host
+        except KeyError:
+            self.host = DATASTORE_API_HOST
+            self.api_base_url = self.__class__.API_BASE_URL
 
     def _request(self, method, data):
         """Make a request over the Http transport to the Cloud Datastore API.
@@ -248,12 +257,12 @@ class Connection(BaseConnection):
         _set_read_options(request, eventual, transaction_id)
 
         if namespace:
-            request.partition_id.namespace = namespace
+            request.partition_id.namespace_id = namespace
 
         request.query.CopyFrom(query_pb)
         response = self._rpc('runQuery', request, datastore_pb.RunQueryResponse)
         return (
-            [e.entity for e in response.batch.entity_result],
+            [e.entity for e in response.batch.entity_results],
             response.batch.end_cursor,  # Assume response always has cursor.
             response.batch.more_results,
             response.batch.skipped_results,
@@ -273,16 +282,16 @@ class Connection(BaseConnection):
         """
         request = datastore_pb.BeginTransactionRequest()
 
-        if serializable:
-            request.isolation_level = (datastore_pb.BeginTransactionRequest.SERIALIZABLE)
-        else:
-            request.isolation_level = (datastore_pb.BeginTransactionRequest.SNAPSHOT)
+        # if serializable:
+        #     request.isolation_level = (datastore_pb.BeginTransactionRequest.SERIALIZABLE)
+        # else:
+        #     request.isolation_level = (datastore_pb.BeginTransactionRequest.SNAPSHOT)
 
         response = self._rpc('beginTransaction', request, datastore_pb.BeginTransactionResponse)
 
         return response.transaction
 
-    def commit(self, mutation_pb, transaction_id=None):
+    def commit(self, request, transaction_id=None):
         """
         Commit dataset mutations in context of current transation (if any).
 
@@ -296,7 +305,7 @@ class Connection(BaseConnection):
         :rtype: :class:`._datastore_v1_pb2.MutationResult`.
         :returns': the result protobuf for the mutation.
         """
-        request = datastore_pb.CommitRequest()
+        # request = datastore_pb.CommitRequest()
 
         if transaction_id:
             request.mode = datastore_pb.CommitRequest.TRANSACTIONAL
@@ -304,9 +313,8 @@ class Connection(BaseConnection):
         else:
             request.mode = datastore_pb.CommitRequest.NON_TRANSACTIONAL
 
-        request.mutation.CopyFrom(mutation_pb)
-        response = self._rpc('commit', request, datastore_pb.CommitResponse)
-        return response.mutation_result
+        # request.mutation.CopyFrom(mutation_pb)
+        return self._rpc('commit', request, datastore_pb.CommitResponse)
 
     def rollback(self, transaction_id):
         """
@@ -359,25 +367,6 @@ def _set_read_options(request, eventual, transaction_id):
         opts.transaction = transaction_id
 
 
-def _prepare_key_for_request(key_pb):  # pragma: NO COVER copied from helpers
-    """
-    Add protobuf keys to a request object.
-
-    :type key_pb: :class:`gcloudoem.datastore.datastore_v1_pb2.Key`
-    :param key_pb: A key to be added to a request.
-
-    :rtype: :class:`gcloudoem.datastore.datastore_v1_pb2.Key`
-    :returns: A key which will be added to a request. It will be the
-              original if nothing needs to be changed.
-    """
-    if key_pb.partition_id.HasField('dataset_id'):
-        new_key_pb = datastore_pb.Key()
-        new_key_pb.CopyFrom(key_pb)
-        new_key_pb.partition_id.ClearField('dataset_id')
-        key_pb = new_key_pb
-    return key_pb
-
-
 def _add_keys_to_request(request_field_pb, key_pbs):
     """
     Add protobuf keys to a request object.
@@ -389,5 +378,4 @@ def _add_keys_to_request(request_field_pb, key_pbs):
     :param list key_pbs: The class:`~gcloudoem.datastore.datastore_v1_pb2.Key`s to add to a request.
     """
     for key_pb in key_pbs:
-        key_pb = _prepare_key_for_request(key_pb)
         request_field_pb.add().CopyFrom(key_pb)

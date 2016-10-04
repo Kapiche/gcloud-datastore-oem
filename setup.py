@@ -27,10 +27,12 @@ if sys.version_info >= (3, 0):
 else:
     install_requires = [
         "future",
-        "httplib2",
-        "oauth2client >= 1.4.7",
-        "protobuf",
-        "pycrypto",
+        'httplib2 >= 0.9.1',
+        'googleapis-common-protos >= 1.3.4',
+        'grpcio >= 1.0.0, < 2.0dev',
+        'oauth2client >= 3.0.0, < 4.0.0dev',
+        'protobuf >= 3.0.0',
+        # "pycrypto",
         "pytz",
         "six",
     ]
